@@ -100,3 +100,18 @@ def plot_handpaths(fname, episode_data, figtitle=""):
     fig.tight_layout()
     fig.savefig(fname)
     plt.close(fig)
+
+def plot_signals(fname, episode_data, figtitle=""):
+    xy = episode_data['xy'].detach()[:,:,0:2]
+    vel = episode_data['xy'].detach()[:,:,2:]
+    tg = episode_data['targets'].detach()
+    inp = episode_data['inp'].detach()
+    hidden = episode_data['hidden'].detach()
+    force = episode_data['force'].detach()
+    fig,ax = plt.subplots(6,1,figsize=(6,13))    
+    ax[0].plot(inp[0,:,0:2],'--')
+    ax[0].plot(xy[0,:,:],'-')
+    ax[0].plot(tg[0,:,:],':')
+    ax[1].plot(inp[0,:,2],'-')
+    ax[3].plot(vel[0,:,:],'-')
+    ax[4].plot()

@@ -78,8 +78,8 @@ class ExperimentTask:
                 inputs[ i, :delay_go_times[i],   2] = 0.0
                 inputs[ i, delay_go_times[i]:,   2] = 1.0
                 # targets for loss function calculation
-                targets[i, :delay_tg_times[i],   :] = start_points[i]
-                targets[i, delay_tg_times[i]:,   :] = final_targets[i]
+                targets[i, :delay_go_times[i],   :] = start_points[i]
+                targets[i, delay_go_times[i]:,   :] = final_targets[i]
             elif is_catch[i]:
                 # inputs to RNN
                 inputs[ i, :delay_tg_times[i], 0:2] = start_points[i, 0:2]
@@ -87,8 +87,8 @@ class ExperimentTask:
                 inputs[ i, :delay_go_times[i],   2] = 0.0
                 inputs[ i, delay_go_times[i]:,   2] = 0.0
                 # targets for loss function calculation
-                targets[i, :delay_tg_times[i],   :] = start_points[i]
-                targets[i, delay_tg_times[i]:,   :] = start_points[i]
+                targets[i, :delay_go_times[i],   :] = start_points[i]
+                targets[i, delay_go_times[i]:,   :] = start_points[i]
             
             # Set input positions and go cues
             inputs[i, :, 0:2] = targets[i, :, 0:2]  # copy target x,y positions
