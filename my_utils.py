@@ -15,7 +15,7 @@ def applied_load(endpoint_vel, k, mode = 'CW'):
 # Run a single episode
 def run_episode(env, task, policy, batch_size, n_t, device, k = 0, *args, **kwargs ):
     # run a single batch
-    inputs, targets, init_states = task.generate(batch_size, n_t, dmax=0.10)
+    inputs, targets, init_states = task.generate(batch_size, n_t, dmax=0.30) # max 30 cm target distance
     targets = th.tensor(targets[:, :, 0:2], device=device, dtype=th.float)
     inp = th.tensor(inputs['inputs'], device=device, dtype=th.float)
     init_states = th.tensor(init_states, device=device, dtype=th.float)
