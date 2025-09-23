@@ -1,5 +1,6 @@
 import torch as th
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import numpy as np
 
 # Apply a curl force field
@@ -109,22 +110,34 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
     hidden = episode_data['hidden'].detach()
     hidden = np.transpose(np.squeeze(hidden, axis=0), (1,0,2))
     force = episode_data['force'].detach()
-    fig,ax = plt.subplots(5,1,figsize=(6,13))
-    ax[0].plot(inp[trial,:,0:2],':')
-    ax[0].plot(xy[trial,:,:],'-')
-    ax[0].plot(tg[trial,:,:],'--')
-    ax[0].set_ylabel('XY (m)')
-    ax[1].plot(inp[trial,:,2],'-')
-    ax[1].set_ylabel('GO CUE')
-    ax[1].set_ylim([0,1])
-    ax[2].plot(vel[trial,:,:],'-')
-    ax[2].set_ylabel('XY VEL (m/s)')
-    ax[3].plot(hidden[trial,:,:],'-')
-    ax[3].set_ylabel('GRU HIDDEN')
-    ax[4].plot(force[trial,:,:],'-')
-    ax[4].set_ylabel('FORCE (N)')
-    ax[4].set_xlabel('TIME (steps)')
-    for i in range(5):
+    fig = plt.figure(figsize=(6, 13), constrained_layout=True)
+    gs = gridspec.GridSpec(7, 1, figure=fig, height_ratios=[1, 2, 2, 4, 4, 4, 4])
+    ax0 = fig.add_subplot(gs[0])
+    ax1 = fig.add_subplot(gs[1])
+    ax2 = fig.add_subplot(gs[2])
+    ax3 = fig.add_subplot(gs[3])
+    ax4 = fig.add_subplot(gs[4])
+    ax5 = fig.add_subplot(gs[5])
+    ax = [ax0, ax1, ax2, ax3, ax4, ax5]
+    ax[0].plot(inp[trial,:,2],'-')
+    ax[0].set_ylabel('GO CUE')
+    ax[0].set_ylim([-0.01,1.01])
+    ax[1].plot(inp[trial,:,0],':')
+    ax[1].plot(xy[trial,:,0],'-')
+    ax[1].plot(tg[trial,:,0],'--')
+    ax[1].set_ylabel('X (m)')
+    ax[2].plot(inp[trial,:,1],':')
+    ax[2].plot(xy[trial,:,1],'-')
+    ax[2].plot(tg[trial,:,1],'--')
+    ax[2].set_ylabel('Y (m)')
+    ax[3].plot(vel[trial,:,:],'-')
+    ax[3].set_ylabel('XY VEL (m/s)')
+    ax[4].plot(hidden[trial,:,:],'-')
+    ax[4].set_ylabel('GRU HIDDEN')
+    ax[5].plot(force[trial,:,:],'-')
+    ax[5].set_ylabel('FORCE (N)')
+    ax[5].set_xlabel('TIME (steps)')
+    for i in range(6):
         ax[i].spines['top'].set_visible(False)
         ax[i].spines['right'].set_visible(False)
         if i<4:
@@ -132,6 +145,5 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
             ax[i].tick_params(axis='x', length=0)
             ax[i].spines['bottom'].set_visible(False)
     fig.suptitle(figtitle, fontsize=14)
-    fig.tight_layout()
     fig.savefig(fname)
     plt.close(fig)
