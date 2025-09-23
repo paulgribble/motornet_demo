@@ -68,8 +68,12 @@ def plot_losses(fname, loss_history):
     for l in loss_history.keys():
         ax[0].plot(loss_history[l])
         ax[1].semilogy(loss_history[l])
-    ax[0].legend(loss_history.keys(), loc='upper right')
-    ax[1].legend(loss_history.keys(), loc='center right')
+    leg0 = ax[0].legend(loss_history.keys(), loc='upper right')
+    leg1 = ax[1].legend(loss_history.keys(), loc='center right')
+    for line in leg0.get_lines():
+        line.set_linewidth(2)  # change this number as desired
+    for line in leg1.get_lines():
+        line.set_linewidth(2)  # change this number as desired
     ax[1].set_xlabel('Batch')
     ax[0].set_ylabel('Loss')
     ax[1].set_ylabel('Loss')

@@ -57,8 +57,8 @@ optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
 
 # Training loop
 
-n_batch       = 5000
-batch_size    =   64
+n_batch       =  3000
+batch_size    =   256
 task.run_mode = 'train' # random reaching across the workspace
 FF_k          = 0.0     # force-field strength
 
