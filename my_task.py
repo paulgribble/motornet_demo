@@ -8,9 +8,11 @@ class ExperimentTask:
         self.dt = self.effector.dt
         self.delay_tg = kwargs.get('delay_tg', [0.3, 0.8]) # target cue delay period
         self.delay_go = kwargs.get('delay_go', [0.8, 1.3]) # go cue delay period
+        self.dmin = kwargs.get("dmin", 0)      # min hand distance between targets (m)
+        self.dmax = kwargs.get("dmax", np.inf) # max hand distance between targets (m)
         self.run_mode = kwargs.get('run_mode', 'train')    # {train, test_center_out, train_center_out}
 
-    def generate(self, batch_size, n_timesteps, **kwargs):
+    def generate(self, batch_size, n_timesteps, dmin=0, dmax=np.inf, **kwargs):
         base_joint = np.deg2rad([50., 90., 0., 0.]).astype(np.float32) # shoulder, elbow angles
 
         # center-out targets
@@ -51,8 +53,19 @@ class ExperimentTask:
             final_targets = start_points + offsets
         else:
             # Random targets for training mode - batch with start_points conversion
-            final_targets = self.effector.joint2cartesian(self.effector.draw_random_uniform_states(batch_size)).detach().cpu().numpy()
-        
+#            final_states = self.effector.draw_random_uniform_states(batch_size)
+#            final_targets = self.effector.joint2cartesian(final_states).detach().cpu().numpy()
+            n = np.shape(start_points)[0]
+            final_targets = np.zeros((n,4))
+            for i in range(n):
+                found = False
+                while not found:
+                    tg_state = self.effector.draw_random_uniform_states(1)
+                    tg_hand = self.effector.joint2cartesian(tg_state).detach().cpu().numpy()
+                    hdist = (get_xy_dist(tg_hand[0][0:2], start_points[i,0:2]))
+                    found = (hdist>=dmin) and (hdist<=dmax)
+                final_targets[i,0:2] = tg_hand[0][0:2]
+
         # Create targets and inputs arrays
         targets = np.zeros((batch_size, n_timesteps, start_points.shape[1]))
         inputs = np.zeros(shape=(batch_size, n_timesteps, 3))
@@ -80,6 +93,7 @@ class ExperimentTask:
         return [all_inputs, targets, init_states]
         #return [inputs, targets, init_states]
 
+
 def generate_delay_time(delay_min, delay_max, delay_mode):
     if delay_mode == 'random':
         delay_time = np.random.uniform(delay_min, delay_max)
@@ -89,4 +103,9 @@ def generate_delay_time(delay_min, delay_max, delay_mode):
         raise AttributeError
 
     return int(delay_time)
+
+
+def get_xy_dist(hand1,hand2):
+    # returns cartesian distance between two (xy) hand positions
+    return np.sqrt(np.sum((hand2-hand1)**2))
 

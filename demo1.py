@@ -83,7 +83,7 @@ for i in tqdm(
 ):
     
     task.run_mode = 'train' # random reaching across the workspace
-    inputs, targets, init_states = task.generate(batch_size, n_t)
+    inputs, targets, init_states = task.generate(batch_size, n_t, dmax=0.10) # max 10 cm target distance
     episode_data = run_episode(env, task, policy, batch_size, n_t, device, k=FF_k)
     loss = calculate_loss(episode_data)
     loss['total'].backward()
