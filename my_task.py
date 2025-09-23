@@ -69,7 +69,8 @@ class ExperimentTask:
         # Create arrays for targets (for loss function) and inputs (for RNN)
         targets = np.zeros((batch_size, n_timesteps, start_points.shape[1]))
         inputs = np.zeros(shape=(batch_size, n_timesteps, 3))
-        
+        print(delay_tg_times)
+        print(delay_go_times)
         for i in range(batch_size):
             if not is_catch[i]:
                 # inputs to RNN

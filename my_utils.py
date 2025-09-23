@@ -108,7 +108,7 @@ def plot_signals(fname, episode_data, figtitle=""):
     inp = episode_data['inp'].detach()
     hidden = episode_data['hidden'].detach()
     force = episode_data['force'].detach()
-    fig,ax = plt.subplots(6,1,figsize=(6,13))    
+    fig,ax = plt.subplots(6,1,figsize=(6,13))
     ax[0].plot(inp[0,:,0:2],'--')
     ax[0].plot(xy[0,:,:],'-')
     ax[0].plot(tg[0,:,:],':')
