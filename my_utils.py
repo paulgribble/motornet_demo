@@ -109,7 +109,7 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
     inp = episode_data['inp'].detach()
     hidden = episode_data['hidden'].detach()
     hidden = np.transpose(np.squeeze(hidden, axis=0), (1,0,2))
-    force = episode_data['force'].detach()
+    activation = episode_data['muscle'].detach()
     fig = plt.figure(figsize=(6, 13), constrained_layout=True)
     gs = gridspec.GridSpec(6, 1, figure=fig, height_ratios=[1, 2, 2, 2, 4, 4])
     ax0 = fig.add_subplot(gs[0])
@@ -120,7 +120,7 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
     ax5 = fig.add_subplot(gs[5])
     ax = [ax0, ax1, ax2, ax3, ax4, ax5]
     ax[0].plot(inp[trial,:,2],'-')
-    ax[0].set_ylabel('GO CUE')
+    ax[0].set_ylabel('GO CUE ([0,1])')
     ax[0].set_ylim([-0.01,1.01])
     ax[1].plot(inp[trial,:,0],':')
     ax[1].plot(xy[trial,:,0],'-')
@@ -134,8 +134,8 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
     ax[3].set_ylabel('XY VEL (m/s)')
     ax[4].plot(hidden[trial,:,:],'-')
     ax[4].set_ylabel('GRU HIDDEN')
-    ax[5].plot(force[trial,:,:],'-')
-    ax[5].set_ylabel('FORCE (N)')
+    ax[5].plot(activation[trial,:,:],'-')
+    ax[5].set_ylabel('MUSCLE ACTIVATION ([0,1])')
     ax[5].set_xlabel('TIME (steps)')
     for i in range(6):
         ax[i].spines['top'].set_visible(False)
