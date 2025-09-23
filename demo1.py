@@ -20,6 +20,7 @@ from my_task import ExperimentTask  # the task
 from my_utils import run_episode    # run a batch of simulations
 from my_utils import plot_losses    # for plotting loss history
 from my_utils import plot_handpaths # for plotting hand paths
+from my_utils import plot_signals.  # for plotting inputs and outputs per trial
 
 print('All packages imported.')
 print('pytorch version: ' + th.__version__)
