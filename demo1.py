@@ -13,12 +13,13 @@ import motornet as mn
 from tqdm import tqdm
 import json
 
-from my_policy import Policy       # the RNN
-from my_loss import calculate_loss # the loss function
-from my_env import ExperimentEnv   # the environment
-from my_task import ExperimentTask # the task
-from my_utils import run_episode   # run a batch of simulations
-from my_utils import plot_losses   # for plotting loss history
+from my_policy import Policy        # the RNN
+from my_loss import calculate_loss  # the loss function
+from my_env import ExperimentEnv    # the environment
+from my_task import ExperimentTask  # the task
+from my_utils import run_episode    # run a batch of simulations
+from my_utils import plot_losses    # for plotting loss history
+from my_utils import plot_handpaths # for plotting hand paths
 
 print('All packages imported.')
 print('pytorch version: ' + th.__version__)
@@ -58,8 +59,8 @@ optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
 # Training loop
 
 n_batch       =  3000
+interval      =   100   # for intermediate plots
 batch_size    =    32
-task.run_mode = 'train' # random reaching across the workspace
 FF_k          = 0.0     # force-field strength
 
 loss_history = {
@@ -80,6 +81,8 @@ for i in tqdm(
     unit     = "batch", 
     total    = n_batch, 
 ):
+    
+    task.run_mode = 'train' # random reaching across the workspace
     inputs, targets, init_states = task.generate(batch_size, n_t)
     episode_data = run_episode(env, task, policy, batch_size, n_t, device, k=FF_k)
     loss = calculate_loss(episode_data)
@@ -95,6 +98,9 @@ for i in tqdm(
     loss_history["muscle_derivative"].append(loss["muscle_derivative"].item())
     loss_history["hidden"].append(loss["hidden"].item())
     loss_history["hidden_derivative"].append(loss["hidden_derivative"].item())
+    if (i % interval)==0:
+        plot_losses(f"demo1_losses.png", loss_history)
+        plot_handpaths("demo1_handpaths.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})")
 
 
 with open('demo1_losses.json', 'w') as file:
@@ -102,28 +108,13 @@ with open('demo1_losses.json', 'w') as file:
 
 # Test performance on the center-out task
 
-task.run_mode = 'test_center_out'
 n_tg = 8 # targets around a circle
+task.run_mode = 'test_center_out'
 inputs, targets, init_states = task.generate(n_tg, n_t)
 episode_data = run_episode(env, task, policy, n_tg, n_t, device, k=0)
 
 # Plot results
 
-xy = episode_data['xy'].detach()
-tg = episode_data['targets'].detach()
-inp = episode_data['inp'].detach()
-
-fig,ax = plt.subplots()
-ax.plot(tg[:,0,0],tg[:,0,1],'rs')
-ax.plot(tg[:,-1,0],tg[:,-1,1],'bs')
-ax.plot(xy[:,:,0].T,xy[:,:,1].T)
-ax.set_xlabel('X (m)')
-ax.set_ylabel('Y (m)')
-ax.set_title('Hand Paths')
-ax.axis('equal')
-fig.tight_layout()
-fig.savefig("demo1_handpaths.png")
-plt.close(fig)
-
+plot_handpaths("demo1_handpaths.png", episode_data)
 plot_losses("demo1_losses.png", loss_history)
 

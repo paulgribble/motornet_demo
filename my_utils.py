@@ -1,5 +1,6 @@
 import torch as th
 import matplotlib.pyplot as plt
+import numpy as np
 
 # Apply a curl force field
 def applied_load(endpoint_vel, k, mode = 'CW'):
@@ -64,7 +65,7 @@ def run_episode(env, task, policy, batch_size, n_t, device, k = 0, *args, **kwar
     }
 
 def plot_losses(fname, loss_history):
-    fig,ax = plt.subplots(2,1, figsize=(10,12))
+    fig,ax = plt.subplots(2,1, figsize=(8,10))
     for l in loss_history.keys():
         ax[0].plot(loss_history[l])
         ax[1].semilogy(loss_history[l])
@@ -77,7 +78,25 @@ def plot_losses(fname, loss_history):
     ax[1].set_xlabel('Batch')
     ax[0].set_ylabel('Loss')
     ax[1].set_ylabel('Loss')
+
     fig.tight_layout()
     fig.savefig(fname)
     plt.close(fig)
 
+def plot_handpaths(fname, episode_data, figtitle=""):
+    xy = episode_data['xy'].detach()
+    tg = episode_data['targets'].detach()
+    fig,ax = plt.subplots(figsize=(8,6))
+    ax.plot(tg[:,0,0],tg[:,0,1],'r.')
+    ax.plot(tg[:,-1,0],tg[:,-1,1],'bs')
+    ax.plot(tg[:,:,0].T,tg[:,:,1].T,'--',lw=0.5)
+    ax.set_prop_cycle(plt.rcParams['axes.prop_cycle'])
+    ax.plot(xy[:,:,0].T,xy[:,:,1].T)
+    ax.set_xlabel('X (m)')
+    ax.set_ylabel('Y (m)')
+    ax.set_title('Hand Paths')
+    ax.axis('equal')
+    fig.suptitle(figtitle, fontsize=14)
+    fig.tight_layout()
+    fig.savefig(fname)
+    plt.close(fig)
