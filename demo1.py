@@ -100,6 +100,7 @@ for i in tqdm(
     if (i % interval)==0:
         plot_losses(f"demo1_losses.png", loss_history)
         plot_handpaths("demo1_handpaths.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})")
+        plot_signals("demo1_signals.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})")
 
 
 with open('demo1_losses.json', 'w') as file:
@@ -116,4 +117,5 @@ episode_data = run_episode(env, task, policy, n_tg, n_t, device, k=0)
 
 plot_handpaths("demo1_handpaths.png", episode_data)
 plot_losses("demo1_losses.png", loss_history)
-
+for i in range(n_tg):
+    plot_signals(f"demo1_signals_{i}", episode_data, figtitle=f"trial {i}", trial=i)
