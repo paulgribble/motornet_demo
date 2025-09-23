@@ -116,7 +116,7 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
     ax[0].set_ylabel('XY (m)')
     ax[1].plot(inp[trial,:,2],'-')
     ax[1].set_ylabel('GO CUE')
-    ax[1].set_ylim[0,1]
+    ax[1].set_ylim([0,1])
     ax[2].plot(vel[trial,:,:],'-')
     ax[2].set_ylabel('XY VEL (m/s)')
     ax[3].plot(hidden[trial,:,:],'-')
