@@ -58,10 +58,10 @@ optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
 
 # Training loop
 
-n_batch       =  3000
+n_batch       =  5000
 interval      =   100   # for intermediate plots
 batch_size    =    32
-FF_k          = 0.0     # force-field strength
+FF_k          =   0.0   # force-field strength
 
 loss_history = {
     "total": [],
