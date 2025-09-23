@@ -132,7 +132,7 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
     ax[2].set_ylabel('Y (m)')
     ax[3].plot(vel[trial,:,:],'-')
     ax[3].set_ylabel('XY VEL (m/s)')
-    ax[4].plot(hidden[trial,:,:],'-')
+    ax[4].plot(hidden[trial,:,:],'-', alpha=0.25)
     ax[4].set_ylabel('GRU HIDDEN')
     ax[5].plot(activation[trial,:,:],'-')
     ax[5].set_ylabel('MUSCLE ACTIVATION [0,1]')
