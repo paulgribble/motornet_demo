@@ -111,7 +111,7 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
     hidden = np.transpose(np.squeeze(hidden, axis=0), (1,0,2))
     force = episode_data['force'].detach()
     fig = plt.figure(figsize=(6, 13), constrained_layout=True)
-    gs = gridspec.GridSpec(7, 1, figure=fig, height_ratios=[1, 2, 2, 4, 4, 4, 4])
+    gs = gridspec.GridSpec(6, 1, figure=fig, height_ratios=[1, 2, 2, 2, 4, 4])
     ax0 = fig.add_subplot(gs[0])
     ax1 = fig.add_subplot(gs[1])
     ax2 = fig.add_subplot(gs[2])
