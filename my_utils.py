@@ -120,7 +120,7 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
     ax5 = fig.add_subplot(gs[5])
     ax = [ax0, ax1, ax2, ax3, ax4, ax5]
     ax[0].plot(inp[trial,:,2],'-')
-    ax[0].set_ylabel('GO CUE ([0,1])')
+    ax[0].set_ylabel('GO CUE [0,1]')
     ax[0].set_ylim([-0.01,1.01])
     ax[1].plot(inp[trial,:,0],':')
     ax[1].plot(xy[trial,:,0],'-')
@@ -135,7 +135,7 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
     ax[4].plot(hidden[trial,:,:],'-')
     ax[4].set_ylabel('GRU HIDDEN')
     ax[5].plot(activation[trial,:,:],'-')
-    ax[5].set_ylabel('MUSCLE ACTIVATION ([0,1])')
+    ax[5].set_ylabel('MUSCLE ACTIVATION [0,1]')
     ax[5].set_xlabel('TIME (steps)')
     for i in range(6):
         ax[i].spines['top'].set_visible(False)
