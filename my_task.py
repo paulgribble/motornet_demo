@@ -69,8 +69,6 @@ class ExperimentTask:
         # Create arrays for targets (for loss function) and inputs (for RNN)
         targets = np.zeros((batch_size, n_timesteps, start_points.shape[1]))
         inputs = np.zeros(shape=(batch_size, n_timesteps, 3))
-        print(delay_tg_times)
-        print(delay_go_times)
         for i in range(batch_size):
             if not is_catch[i]:
                 # inputs to RNN
@@ -90,9 +88,6 @@ class ExperimentTask:
                 # targets for loss function calculation
                 targets[i, :delay_go_times[i],   :] = start_points[i]
                 targets[i, delay_go_times[i]:,   :] = start_points[i]
-            
-            # Set input positions and go cues
-            inputs[i, :, 0:2] = targets[i, :, 0:2]  # copy target x,y positions
         
         # Add vectorized noise to all inputs at once
         noise = np.random.normal(loc=0., scale=1e-3, size=(batch_size, n_timesteps, 3))
