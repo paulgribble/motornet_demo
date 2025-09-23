@@ -78,7 +78,7 @@ def plot_losses(fname, loss_history):
     ax[1].set_xlabel('Batch')
     ax[0].set_ylabel('Loss')
     ax[1].set_ylabel('Loss')
-
+    ax[0].set_ylim([0,loss_history['total'][0]])
     fig.tight_layout()
     fig.savefig(fname)
     plt.close(fig)

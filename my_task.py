@@ -66,25 +66,33 @@ class ExperimentTask:
                     found = (hdist>=dmin) and (hdist<=dmax)
                 final_targets[i,0:2] = tg_hand[0][0:2]
 
-        # Create targets and inputs arrays
+        # Create arrays for targets (for loss function) and inputs (for RNN)
         targets = np.zeros((batch_size, n_timesteps, start_points.shape[1]))
         inputs = np.zeros(shape=(batch_size, n_timesteps, 3))
         
-        # Set all timing-dependent values in one loop
         for i in range(batch_size):
-            # Set target timing for all trials
-            targets[i, :delay_tg_times[i], :] = start_points[i]  # initial targets are start positions
-            targets[i, delay_tg_times[i]:, :] = final_targets[i] # final targets after delay
+            if not is_catch[i]:
+                # inputs to RNN
+                inputs[ i, :delay_tg_times[i], 0:2] = start_points[i, 0:2]
+                inputs[ i, delay_tg_times[i]:, 0:2] = final_targets[i,0:2]
+                inputs[ i, :delay_go_times[i],   2] = 0.0
+                inputs[ i, delay_go_times[i]:,   2] = 1.0
+                # targets for loss function calculation
+                targets[i, :delay_tg_times[i],   :] = start_points[i]
+                targets[i, delay_tg_times[i]:,   :] = final_targets[i]
+            elif is_catch[i]:
+                # inputs to RNN
+                inputs[ i, :delay_tg_times[i], 0:2] = start_points[i, 0:2]
+                inputs[ i, delay_tg_times[i]:, 0:2] = final_targets[i,0:2]
+                inputs[ i, :delay_go_times[i],   2] = 0.0
+                inputs[ i, delay_go_times[i]:,   2] = 0.0
+                # targets for loss function calculation
+                targets[i, :delay_tg_times[i],   :] = start_points[i]
+                targets[i, delay_tg_times[i]:,   :] = start_points[i]
             
             # Set input positions and go cues
             inputs[i, :, 0:2] = targets[i, :, 0:2]  # copy target x,y positions
-            
-            if not is_catch[i]:
-                # Set initial target positions before delay_tg for non-catch trials
-                inputs[i, :delay_tg_times[i], 0:2] = start_points[i, 0:2]
-                # Set go cue for non-catch trials
-                inputs[i, delay_go_times[i]:, 2] = 1.0
-
+        
         # Add vectorized noise to all inputs at once
         noise = np.random.normal(loc=0., scale=1e-3, size=(batch_size, n_timesteps, 3))
         inputs += noise
