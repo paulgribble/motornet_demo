@@ -170,7 +170,9 @@ def plot_signals(fname, episode_data, figtitle="", trial=0, coord="xy"):
 
 def xy_to_joints_helper(xy, l1, l2):
     a0,a1 = 0,0
-    a1 = np.acos(((xy[0]*xy[0])+(xy[1]*xy[1])-(l1*l1)-(l2*l2))/(2*l1*l2))
+    tmp = ((xy[0]*xy[0])+(xy[1]*xy[1])-(l1*l1)-(l2*l2))/(2*l1*l2)
+    tmp = np.clip(tmp, -1.0, 1.0)
+    a1 = np.acos(tmp)
     a0 = np.atan(xy[1]/xy[0]) - np.atan((l2*np.sin(a1))/(l1+(l2*np.cos(a1))))
     if a0 < 0:
         a0 = np.pi+a0
