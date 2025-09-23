@@ -112,8 +112,8 @@ def plot_signals(fname, episode_data, figtitle="", trial=0, coord="xy"):
         tg = episode_data['targets'].detach()
         inp = episode_data['inp'].detach()
     elif (coord=="joint"):
-        xy = episode_data['joint'].detach()[:,:,0:2]
-        vel = episode_data['joint'].detach()[:,:,2:]
+        xy = episode_data['joint'].detach()[:,:,0:2] * 180/np.pi
+        vel = episode_data['joint'].detach()[:,:,2:] * 180/np.pi
         tg = xy_to_joints(episode_data['targets'][:,:,0:2].detach(), episode_data['l1'], episode_data['l2']) * 180 / np.pi
         inp = episode_data['inp'].detach().numpy()
         inp[:,:,0:2] = xy_to_joints(inp[:,:,0:2], episode_data['l1'], episode_data['l2']) * 180 / np.pi
