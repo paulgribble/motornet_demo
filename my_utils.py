@@ -62,7 +62,10 @@ def run_episode(env, task, policy, batch_size, n_t, device, k = 0, *args, **kwar
         'force' : th.cat(all_force, dim=1),
         'targets' : th.cat(all_targets, dim=1),
         'inp' : th.cat(all_inp, dim=1),
-        'joint' : th.cat(all_joint, dim=1)
+        'joint' : th.cat(all_joint, dim=1),
+        'l1'    : env.skeleton.l1,
+        'l2'    : env.skeleton.l2,
+        'dt'    : env.dt,
     }
 
 def plot_losses(fname, loss_history):
@@ -102,11 +105,18 @@ def plot_handpaths(fname, episode_data, figtitle=""):
     fig.savefig(fname)
     plt.close(fig)
 
-def plot_signals(fname, episode_data, figtitle="", trial=0):
-    xy = episode_data['xy'].detach()[:,:,0:2]
-    vel = episode_data['xy'].detach()[:,:,2:]
-    tg = episode_data['targets'].detach()
-    inp = episode_data['inp'].detach()
+def plot_signals(fname, episode_data, figtitle="", trial=0, coord="xy"):
+    if (coord=="xy"):
+        xy = episode_data['xy'].detach()[:,:,0:2]
+        vel = episode_data['xy'].detach()[:,:,2:]
+        tg = episode_data['targets'].detach()
+        inp = episode_data['inp'].detach()
+    elif (coord=="joint"):
+        xy = episode_data['joint'].detach()[:,:,0:2]
+        vel = episode_data['joint'].detach()[:,:,2:]
+        tg = xy_to_joints(episode_data['targets'][:,:,0:2].detach(), episode_data['l1'], episode_data['l2']) * 180 / np.pi
+        inp = episode_data['inp'].detach().numpy()
+        inp[:,:,0:2] = xy_to_joints(inp[:,:,0:2], episode_data['l1'], episode_data['l2']) * 180 / np.pi
     hidden = episode_data['hidden'].detach()
     hidden = np.transpose(np.squeeze(hidden, axis=0), (1,0,2))
     activation = episode_data['muscle'].detach()
@@ -125,13 +135,22 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
     ax[1].plot(inp[trial,:,0],':')
     ax[1].plot(xy[trial,:,0],'-')
     ax[1].plot(tg[trial,:,0],'--')
-    ax[1].set_ylabel('X (m)')
+    if (coord=="xy"):
+        ax[1].set_ylabel('X (m)')
+    elif (coord=="joint"):
+        ax[1].set_ylabel('SHOULDER (deg)')
     ax[2].plot(inp[trial,:,1],':')
     ax[2].plot(xy[trial,:,1],'-')
     ax[2].plot(tg[trial,:,1],'--')
-    ax[2].set_ylabel('Y (m)')
+    if (coord=="xy"):
+        ax[2].set_ylabel('Y (m)')
+    elif (coord=="joint"):
+        ax[2].set_ylabel('ELBOW (deg)')
     ax[3].plot(vel[trial,:,:],'-')
-    ax[3].set_ylabel('XY VEL (m/s)')
+    if (coord=="xy"):
+        ax[3].set_ylabel('XY VEL (m/s)')
+    elif (coord=="joint"):
+        ax[3].set_ylabel('JOINT VEL (deg/s)')
     ax[4].plot(hidden[trial,:,:],'-', alpha=0.25)
     ax[4].set_ylabel('GRU HIDDEN')
     ax[5].plot(activation[trial,:,:],'-')
@@ -147,3 +166,31 @@ def plot_signals(fname, episode_data, figtitle="", trial=0):
     fig.suptitle(figtitle, fontsize=14)
     fig.savefig(fname)
     plt.close(fig)
+
+
+def xy_to_joints_helper(xy, l1, l2):
+    a0,a1 = 0,0
+    a1 = np.acos(((xy[0]*xy[0])+(xy[1]*xy[1])-(l1*l1)-(l2*l2))/(2*l1*l2))
+    a0 = np.atan(xy[1]/xy[0]) - np.atan((l2*np.sin(a1))/(l1+(l2*np.cos(a1))))
+    if a0 < 0:
+        a0 = np.pi+a0
+    elif a0 > np.pi:
+        a0 = a0-np.pi
+    return np.array([a0,a1])
+
+def xy_to_joints(xy, l1, l2):
+    if (len(np.shape(xy)) == 1):
+        joints = xy_to_joints_helper(xy, l1, l2)
+    elif (len(np.shape(xy)) == 2):
+        r,c = np.shape(xy)
+        joints = np.zeros((r,c))
+        for i in range(r):
+            joints[i,:] = xy_to_joints_helper(xy[i,:], l1, l2)
+    elif (len(np.shape(xy)) == 3):
+        z,r,c = np.shape(xy)
+        joints = np.zeros((z,r,c))
+        for iz in range(z):
+            for i in range(r):
+                joints[iz,i,:] = xy_to_joints_helper(xy[iz,i,:], l1, l2)
+    return joints
+
