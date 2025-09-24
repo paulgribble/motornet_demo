@@ -71,8 +71,8 @@ def run_episode(env, task, policy, batch_size, n_t, device, k = 0, *args, **kwar
 def plot_losses(fname, loss_history):
     fig,ax = plt.subplots(2,1, figsize=(8,10))
     for l in loss_history.keys():
-        ax[0].plot(loss_history[l])
-        ax[1].semilogy(loss_history[l])
+        ax[0].plot(loss_history[l], alpha=0.5)
+        ax[1].semilogy(loss_history[l], alpha=0.5)
     leg0 = ax[0].legend(loss_history.keys(), loc='upper right')
     leg1 = ax[1].legend(loss_history.keys(), loc='center right')
     for line in leg0.get_lines():
