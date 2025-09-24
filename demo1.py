@@ -57,25 +57,31 @@ policy = Policy(env.observation_space.shape[0] + inputs['inputs'].shape[2], n_un
 optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
 
 
-# Training loop
+# Main training loop
 
 n_batch       = 10000
 interval      =   100   # for intermediate plots
 batch_size    =    32
 FF_k          =     0   # force-field strength
 
+# Pre-allocate numpy arrays instead of lists for better memory efficiency
 loss_history = {
-    "total": [],
-    "position": [],
-    "speed": [],
-    "jerk": [],
-    "muscle": [],
-    "muscle_derivative": [],
-    "hidden": [],
-    "hidden_derivative": [],
+    "total": np.zeros(n_batch, dtype=np.float32),
+    "position": np.zeros(n_batch, dtype=np.float32),
+    "speed": np.zeros(n_batch, dtype=np.float32),
+    "jerk": np.zeros(n_batch, dtype=np.float32),
+    "muscle": np.zeros(n_batch, dtype=np.float32),
+    "muscle_derivative": np.zeros(n_batch, dtype=np.float32),
+    "hidden": np.zeros(n_batch, dtype=np.float32),
+    "hidden_derivative": np.zeros(n_batch, dtype=np.float32),
 }
 
+# Optimize loss keys for faster iteration
+loss_keys = ["total", "position", "speed", "jerk", 
+             "muscle", "muscle_derivative", "hidden", "hidden_derivative"]
+
 print(f"simulating {ep_dur} second movements using {n_t} time points")
+
 for i in tqdm(
     iterable = range(n_batch), 
     desc     = f"training {n_batch} batches of {batch_size}", 
@@ -83,29 +89,37 @@ for i in tqdm(
     total    = n_batch, 
 ):
     
-    task.run_mode = 'train' # random reaching across the workspace
+    task.run_mode = 'train'
     episode_data = run_episode(env, task, policy, batch_size, n_t, device, k=FF_k)
     loss = calculate_loss(episode_data)
     loss['total'].backward()
-    th.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=1)  # important to make sure gradients don't get crazy
+    th.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=1)
     optimizer.step()
-    optimizer.zero_grad()
-    loss_history["total"].append(loss["total"].item())
-    loss_history["position"].append(loss["position"].item())
-    loss_history["speed"].append(loss["speed"].item())
-    loss_history["jerk"].append(loss["jerk"].item())
-    loss_history["muscle"].append(loss["muscle"].item())
-    loss_history["muscle_derivative"].append(loss["muscle_derivative"].item())
-    loss_history["hidden"].append(loss["hidden"].item())
-    loss_history["hidden_derivative"].append(loss["hidden_derivative"].item())
-    if (i % interval)==0:
-        plot_losses(f"demo1_losses.png", loss_history)
+    optimizer.zero_grad(set_to_none=True)  # More memory efficient
+    
+    # Track ALL losses efficiently - vectorized assignment with no gradients
+    with th.no_grad():  # Don't need gradients for loss tracking
+        for key in loss_keys:
+            loss_history[key][i] = loss[key].item()
+    
+    # Plotting optimizations while keeping same frequency
+    if i % interval == 0:
+        # Convert to lists only for the portion we need for plotting
+        current_history = {key: loss_history[key][:i+1].tolist() for key in loss_keys}
+        plot_losses(f"demo1_losses.png", current_history)
         plot_handpaths("demo1_handpaths.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})")
-        for j in range(8):
+        for j in range(4):  # plot 4 example trials
             plot_signals(f"demo1_signals_{j}.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})", trial=j)
 
+# Convert back to lists at the end for compatibility with your existing code
+for key in loss_keys:
+    loss_history[key] = loss_history[key].tolist()
+
+# save losses to a .json file
 with open('demo1_losses.json', 'w') as file:
     json.dump(loss_history, file)
+
+
 
 # Test performance on the center-out task
 
