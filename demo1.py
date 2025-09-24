@@ -62,7 +62,7 @@ optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
 n_batch       =  5000
 interval      =   100   # for intermediate plots
 batch_size    =    32
-FF_k          =   0.0   # force-field strength
+FF_k          =     0   # force-field strength
 
 loss_history = {
     "total": [],
@@ -101,7 +101,10 @@ for i in tqdm(
     if (i % interval)==0:
         plot_losses(f"demo1_losses.png", loss_history)
         plot_handpaths("demo1_handpaths.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})")
-        plot_signals("demo1_signals.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})", coord="joint")
+        plot_signals("demo1_signals_0.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})", coord="joint", trial=0)
+        plot_signals("demo1_signals_1.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})", coord="joint", trial=1)
+        plot_signals("demo1_signals_2.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})", coord="joint", trial=2)
+
 
 
 with open('demo1_losses.json', 'w') as file:
