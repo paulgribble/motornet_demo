@@ -444,10 +444,15 @@ class TwoDofArm(Skeleton):
     c12 = th.cos(pos_sum)
     s12 = th.sin(pos_sum)
 
-    end_pos_x = self.L1 * c1 + self.L2 * c12
-    end_pos_y = self.L1 * s1 + self.L2 * s12
-    end_vel_x = - (self.L1 * s1 + self.L2 * s12) * vel0 - self.L2 * s12 * vel1
-    end_vel_y = (self.L1 * c1 + self.L2 * c12) * vel0 + self.L2 * c12 * vel1
+    L1c1  = self.L1 * c1
+    L2c12 = self.L2 * c12
+    L1s1  = self.L1 * s1
+    L2s12 = self.L2 * s12
+
+    end_pos_x = L1c1 + L2c12
+    end_pos_y = L1s1 + L2s12
+    end_vel_x = - (end_pos_y) * vel0 - L2s12 * vel1
+    end_vel_y =   (end_pos_x) * vel0 + L2c12 * vel1
     return th.stack([end_pos_x, end_pos_y, end_vel_x, end_vel_y], dim=1)
 
   @th.compile(mode=compile_mode, backend=compile_backend, dynamic=compile_dynamic)
