@@ -102,7 +102,7 @@ for i in tqdm(
         plot_losses(f"demo1_losses.png", loss_history)
         plot_handpaths("demo1_handpaths.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})")
         for j in range(8):
-            plot_signals(f"demo1_signals_{j}.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})", coord="joint", trial=j)
+            plot_signals(f"demo1_signals_{j}.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})", trial=j)
 
 with open('demo1_losses.json', 'w') as file:
     json.dump(loss_history, file)
