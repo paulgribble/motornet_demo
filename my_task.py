@@ -80,8 +80,8 @@ class ExperimentTask:
                 inputs[ i, :delay_go_times[i],   2] = 0.0
                 inputs[ i, delay_go_times[i]:,   2] = 1.0
                 # targets for loss function calculation
-                targets[i, :delay_go_times[i]+1,   :] = start_points[i]
-                targets[i, delay_go_times[i]+1:,   :] = final_targets[i]
+                targets[i, :delay_go_times[i],   :] = start_points[i]
+                targets[i, delay_go_times[i]:,   :] = final_targets[i]
             elif is_catch[i]:
                 # inputs to RNN
                 inputs[ i, :delay_tg_times[i], 0:2] = start_points[i, 0:2]
@@ -89,8 +89,8 @@ class ExperimentTask:
                 inputs[ i, :delay_go_times[i],   2] = 0.0
                 inputs[ i, delay_go_times[i]:,   2] = 0.0
                 # targets for loss function calculation
-                targets[i, :delay_go_times[i]+1,   :] = start_points[i]
-                targets[i, delay_go_times[i]+1:,   :] = start_points[i]
+                targets[i, :delay_go_times[i],   :] = start_points[i]
+                targets[i, delay_go_times[i]:,   :] = start_points[i]
         
         # Add vectorized noise to all inputs at once
         noise = np.random.normal(loc=0., scale=1e-3, size=(batch_size, n_timesteps, 3))

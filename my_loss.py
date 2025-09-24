@@ -4,10 +4,10 @@ import torch as th
 loss_weights = {
     'position'          : 1e+2,
     'speed'             : 1e-1,
-    'jerk'              : 1e+4, #1e+2
-    'muscle'            : 1e-1, #1e-2
-    'muscle_derivative' : 1e-2,
-    'hidden'            : 1e-0,
+    'jerk'              : 1e+4,
+    'muscle'            : 5e-1,
+    'muscle_derivative' : 1e-1,
+    'hidden'            : 5e-0,
     'hidden_derivative' : 1e+1
     }
 
