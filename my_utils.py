@@ -116,7 +116,8 @@ def plot_signals(fname, episode_data, figtitle="", trial=0, coord="xy"):
         vel = episode_data['joint'].detach()[:,:,2:] * 180/np.pi
         tg = xy_to_joints(episode_data['targets'][:,:,0:2].detach(), episode_data['l1'], episode_data['l2']) * 180 / np.pi
         inp = episode_data['inp'].detach().numpy()
-        inp[:,:,0:2] = xy_to_joints(inp[:,:,0:2], episode_data['l1'], episode_data['l2']) * 180 / np.pi
+        inp_tmp = inp.copy()
+        inp[:,:,0:2] = xy_to_joints(inp_tmp[:,:,0:2], episode_data['l1'], episode_data['l2']) * 180 / np.pi
     hidden = episode_data['hidden'].detach()
     hidden = np.transpose(np.squeeze(hidden, axis=0), (1,0,2))
     activation = episode_data['muscle'].detach()
