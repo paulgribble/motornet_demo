@@ -3,6 +3,7 @@ os.environ['OMP_NUM_THREADS'] = '1'
 os.environ['MKL_NUM_THREADS'] = '1' # Set this too just in case
 
 import torch as th
+th._dynamo.reset()              # clear compilation cache
 th.set_num_threads(1)           # intra-op
 th.set_num_interop_threads(1)   # inter-op
 th._dynamo.config.cache_size_limit = 64
