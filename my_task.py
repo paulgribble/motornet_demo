@@ -13,6 +13,9 @@ class ExperimentTask:
         self.run_mode = kwargs.get('run_mode', 'train')    # {train, test_center_out, train_center_out}
 
     def generate(self, batch_size, n_timesteps, dmin=0, dmax=np.inf, **kwargs):
+        # generate inputs to RNN, targets for use in loss function, and initial states
+        # dmin and dmax are bounds on min and max target distance for the 'train' random target selection
+
         base_joint = np.deg2rad([50., 90., 0., 0.]).astype(np.float32) # shoulder, elbow angles
 
         # center-out targets
@@ -77,8 +80,8 @@ class ExperimentTask:
                 inputs[ i, :delay_go_times[i],   2] = 0.0
                 inputs[ i, delay_go_times[i]:,   2] = 1.0
                 # targets for loss function calculation
-                targets[i, :delay_go_times[i],   :] = start_points[i]
-                targets[i, delay_go_times[i]:,   :] = final_targets[i]
+                targets[i, :delay_go_times[i]+1,   :] = start_points[i]
+                targets[i, delay_go_times[i]+1:,   :] = final_targets[i]
             elif is_catch[i]:
                 # inputs to RNN
                 inputs[ i, :delay_tg_times[i], 0:2] = start_points[i, 0:2]
@@ -86,8 +89,8 @@ class ExperimentTask:
                 inputs[ i, :delay_go_times[i],   2] = 0.0
                 inputs[ i, delay_go_times[i]:,   2] = 0.0
                 # targets for loss function calculation
-                targets[i, :delay_go_times[i],   :] = start_points[i]
-                targets[i, delay_go_times[i]:,   :] = start_points[i]
+                targets[i, :delay_go_times[i]+1,   :] = start_points[i]
+                targets[i, delay_go_times[i]+1:,   :] = start_points[i]
         
         # Add vectorized noise to all inputs at once
         noise = np.random.normal(loc=0., scale=1e-3, size=(batch_size, n_timesteps, 3))
@@ -98,7 +101,7 @@ class ExperimentTask:
         #return [inputs, targets, init_states]
 
 
-def generate_delay_time(delay_min, delay_max, delay_mode):
+def generate_delay_time(delay_min, delay_max, delay_mode):#
     if delay_mode == 'random':
         delay_time = np.random.uniform(delay_min, delay_max)
     elif delay_mode == 'noDelayInput':
