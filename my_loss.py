@@ -2,13 +2,13 @@ import numpy as np
 import torch as th
 
 loss_weights = {
-    'position'          : 1e+2,
+    'position'          : 1e+3,
     'speed'             : 1e-1,
-    'jerk'              : 1e+4,
-    'muscle'            : 5e-1,
-    'muscle_derivative' : 1e-1,
-    'hidden'            : 5e-0,
-    'hidden_derivative' : 1e+1
+    'jerk'              : 1e+0,
+    'muscle'            : 1e-1,
+    'muscle_derivative' : 1e+0,
+    'hidden'            : 1e+1,
+    'hidden_derivative' : 1e+3
     }
 
 
