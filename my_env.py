@@ -9,7 +9,7 @@ class ExperimentEnv(mn.environment.Environment):
   def __init__(self, *args, **kwargs):
     # pass everything as-is to the parent Environment class
     super().__init__(*args, **kwargs)
-    self.__name__ = "ExpTask"
+    self.__name__ = "ExperimentEnv"
 
   def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
     self._set_generator(seed)  # seed the environment and the effector

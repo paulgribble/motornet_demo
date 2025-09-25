@@ -24,12 +24,15 @@ from my_utils  import plot_losses    # for plotting loss history
 from my_utils  import plot_handpaths # for plotting hand paths
 from my_utils  import plot_signals   # for plotting inputs and outputs per trial
 from my_utils  import save_model     # for saving model config, weights, losses to disk
+from my_utils  import load_model     # for loading model config and weights from disk
 
 print('All packages imported.')
 print('pytorch version: ' + th.__version__)
 print('numpy version: ' + np.__version__)
 print('motornet version: ' + mn.__version__)
 
+
+########## DEFINE A NEW MODEL AND TRAIN IT ON RANDOM REACHES ##########
 
 # use the cpu not the gpu
 device = th.device("cpu")
@@ -109,10 +112,10 @@ for i in tqdm(
     if (i>0) and (i % interval == 0):
         # Convert to lists only for the portion we need for plotting
         current_history = {key: loss_history[key][:i+1].tolist() for key in loss_keys}
-        plot_losses(f"demo1_losses.png", current_history)
-        plot_handpaths("demo1_handpaths.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})")
+        plot_losses(current_history, f"demo1_losses.png")
+        plot_handpaths(episode_data, "demo1_handpaths.png", figtitle=f"batch {i:04d} (n={batch_size})")
         for j in range(4):  # plot 4 example trials
-            plot_signals(f"demo1_signals_{j}.png", episode_data, figtitle=f"batch {i:04d} (n={batch_size})", trial=j)
+            plot_signals(episode_data, f"demo1_signals_{j}.png", figtitle=f"batch {i:04d} (n={batch_size})", trial=j)
 
 # Convert back to lists at the end for compatibility with your existing code
 for key in loss_keys:
@@ -122,19 +125,23 @@ save_model(env, policy, loss_history, "demo1")
 
 
 
-# Test performance on the center-out task
+########## LOAD A MODEL AND TEST IT ON CENTER-OUT REACHES ##########
 
-n_tg = 8 # targets around a circle
+n_tg     = 8    # number of targets for center-out task
+sim_time = 3.00 # simulation time (seconds)
+FF_k     = 0    # FF strength
+
+env,task,policy,device = load_model("demo1_cfg.json", "demo1_weights.pkl")
+n_t = int(sim_time / env.dt) # simulation steps
 task.run_mode = 'test_center_out'
 inputs, targets, init_states = task.generate(n_tg, n_t)
-episode_data = run_episode(env, task, policy, n_tg, n_t, device, k=0)
+episode_data = run_episode(env, task, policy, n_tg, n_t, device, k=FF_k)
 
 # Plot results
 
-plot_handpaths("demo1_handpaths.png", episode_data)
-plot_losses("demo1_losses.png", loss_history)
+plot_handpaths(episode_data)
 for i in range(n_tg):
-    plot_signals(f"demo1_signals_{i}", episode_data, figtitle=f"trial {i}", trial=i)
+    plot_signals(episode_data, figtitle=f"trial {i}", trial=i)
 
 # save episide data to a .pkl file
 with open("demo1_episode_data.pkl", "wb") as f:

@@ -3,6 +3,10 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
 import json
+import motornet as mn
+from my_env    import ExperimentEnv  # the environment
+from my_task   import ExperimentTask # a task
+from my_policy import Policy         # the RNN
 
 # Apply a curl force field
 def applied_load(endpoint_vel, k, mode = 'CW'):
@@ -69,7 +73,7 @@ def run_episode(env, task, policy, batch_size, n_t, device, k = 0, *args, **kwar
         'dt'    : env.dt,
     }
 
-def plot_losses(fname, loss_history):
+def plot_losses(loss_history, fname=""):
     fig,ax = plt.subplots(2,1, figsize=(8,10))
     for l in loss_history.keys():
         ax[0].plot(loss_history[l], alpha=0.5)
@@ -85,10 +89,14 @@ def plot_losses(fname, loss_history):
     ax[1].set_ylabel('Loss')
     ax[0].set_ylim([0,loss_history['total'][0]])
     fig.tight_layout()
-    fig.savefig(fname)
-    plt.close(fig)
+    if not fname=="":
+        fig.savefig(fname)
+        plt.close(fig)
+    else:
+        plt.show()
+        return fig,ax
 
-def plot_handpaths(fname, episode_data, figtitle=""):
+def plot_handpaths(episode_data, fname="", figtitle=""):
     xy = episode_data['xy'].detach()
     tg = episode_data['targets'].detach()
     fig,ax = plt.subplots(figsize=(8,6))
@@ -103,10 +111,14 @@ def plot_handpaths(fname, episode_data, figtitle=""):
     ax.axis('equal')
     fig.suptitle(figtitle, fontsize=14)
     fig.tight_layout()
-    fig.savefig(fname)
-    plt.close(fig)
+    if not fname=="":
+        fig.savefig(fname)
+        plt.close(fig)
+    else:
+        plt.show()
+        return fig,ax
 
-def plot_signals(fname, episode_data, figtitle="", trial=0, coord="xy"):
+def plot_signals(episode_data, fname="", figtitle="", trial=0, coord="xy"):
     if (coord=="xy"):
         xy = episode_data['xy'].detach()[:,:,0:2]
         vel = episode_data['xy'].detach()[:,:,2:]
@@ -166,8 +178,12 @@ def plot_signals(fname, episode_data, figtitle="", trial=0, coord="xy"):
             ax[i].tick_params(axis='x', length=0)
             ax[i].spines['bottom'].set_visible(False)
     fig.suptitle(figtitle, fontsize=14)
-    fig.savefig(fname)
-    plt.close(fig)
+    if not fname=="":
+        fig.savefig(fname)
+        plt.close(fig)
+    else:
+        plt.show()
+        return fig,ax
 
 
 def xy_to_joints_helper(xy, l1, l2):
@@ -221,3 +237,29 @@ def save_model(env, policy, losses, model_name, quiet=False):
         print(f"saved {losses_file}")
         print(f"saved {cfg_file}")
 
+def load_model(cfg_file, weight_file):
+
+    device = th.device("cpu")
+    cfg = json.load(open(cfg_file, 'r'))
+    dt = cfg['effector']['dt']
+    muscle_name = cfg['effector']['muscle']['name']
+    muscle = getattr(mn.muscle, muscle_name)()
+    effector = mn.effector.RigidTendonArm26(muscle=muscle, timestep=dt)
+    proprioception_delay = cfg['proprioception_delay']*cfg['dt']
+    vision_delay = cfg['vision_delay']*cfg['dt']
+    action_noise = cfg['action_noise'][0]
+    proprioception_noise = cfg['proprioception_noise'][0]
+    vision_noise = cfg['vision_noise'][0]
+    max_ep_duration = cfg['max_ep_duration']
+    env = ExperimentEnv(effector=effector, max_ep_duration=max_ep_duration,
+                        proprioception_delay=proprioception_delay, vision_delay=vision_delay,
+                        proprioception_noise=proprioception_noise, vision_noise=vision_noise,
+                        action_noise=action_noise
+                        )
+    w = th.load(weight_file, weights_only=True)
+    n_hidden = int(w['gru.weight_ih_l0'].shape[0]/3)
+    task = ExperimentTask(effector=env.effector)
+    inputs, _, _ = task.generate(1, 1) # just to get input shape
+    policy = Policy(env.observation_space.shape[0] + inputs['inputs'].shape[2], n_hidden, env.n_muscles, device=device)
+    policy.load_state_dict(w)
+    return env, task, policy, device
