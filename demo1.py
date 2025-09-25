@@ -13,7 +13,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import motornet as mn
 from tqdm import tqdm
-import json
 import pickle
 
 from my_policy import Policy         # the RNN

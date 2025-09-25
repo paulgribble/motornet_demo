@@ -2,6 +2,7 @@ import torch as th
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
+import json
 
 # Apply a curl force field
 def applied_load(endpoint_vel, k, mode = 'CW'):
