@@ -79,7 +79,7 @@ def plot_losses(loss_history, fname=""):
         ax[0].plot(loss_history[l], alpha=0.5)
         ax[1].semilogy(loss_history[l], alpha=0.5)
     leg0 = ax[0].legend(loss_history.keys(), loc='upper right')
-    leg1 = ax[1].legend(loss_history.keys(), loc='bottom right')
+    leg1 = ax[1].legend(loss_history.keys(), loc='lower right')
     for line in leg0.get_lines():
         line.set_linewidth(2)  # change this number as desired
     for line in leg1.get_lines():
