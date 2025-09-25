@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import motornet as mn
 from tqdm import tqdm
 import json
+import pickle
 
 from my_policy import Policy         # the RNN
 from my_loss   import calculate_loss # the loss function
@@ -23,6 +24,7 @@ from my_utils  import run_episode    # run a batch of simulations
 from my_utils  import plot_losses    # for plotting loss history
 from my_utils  import plot_handpaths # for plotting hand paths
 from my_utils  import plot_signals   # for plotting inputs and outputs per trial
+from my_utils  import save_model     # for saving model config, weights, losses to disk
 
 print('All packages imported.')
 print('pytorch version: ' + th.__version__)
@@ -61,7 +63,7 @@ optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
 
 # Main training loop
 
-n_batch       = 10000
+n_batch       = 100
 interval      =   100   # for intermediate plots
 batch_size    =    64
 FF_k          =     0   # force-field strength
@@ -117,9 +119,7 @@ for i in tqdm(
 for key in loss_keys:
     loss_history[key] = loss_history[key].tolist()
 
-# save losses to a .json file
-with open('demo1_losses.json', 'w') as file:
-    json.dump(loss_history, file)
+save_model(env, policy, loss_history, "demo1")
 
 
 
@@ -136,3 +136,8 @@ plot_handpaths("demo1_handpaths.png", episode_data)
 plot_losses("demo1_losses.png", loss_history)
 for i in range(n_tg):
     plot_signals(f"demo1_signals_{i}", episode_data, figtitle=f"trial {i}", trial=i)
+
+# save episide data to a .pkl file
+with open("demo1_episode_data.pkl", "wb") as f:
+    pickle.dump(episode_data, f)
+

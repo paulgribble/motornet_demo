@@ -197,3 +197,26 @@ def xy_to_joints(xy, l1, l2):
                 joints[iz,i,:] = xy_to_joints_helper(xy[iz,i,:], l1, l2)
     return joints
 
+
+def save_model(env, policy, losses, model_name, quiet=False):
+    weight_file = model_name + "_weights.pkl"
+    losses_file = model_name + "_losses.json"
+    cfg_file    = model_name + "_cfg.json"
+
+    # save model weights
+    th.save(policy.state_dict(), weight_file)
+
+    # save training history (log)
+    with open(losses_file, 'w') as file:
+        json.dump(losses, file)
+
+    # save environment configuration dictionary
+    cfg = env.get_save_config()
+    with open(cfg_file, 'w') as file:
+        json.dump(cfg, file)
+
+    if (quiet == False):
+        print(f"saved {weight_file}")
+        print(f"saved {losses_file}")
+        print(f"saved {cfg_file}")
+
