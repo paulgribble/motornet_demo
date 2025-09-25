@@ -106,7 +106,7 @@ for i in tqdm(
             loss_history[key][i] = loss[key].item()
     
     # Plotting optimizations while keeping same frequency
-    if i % interval == 0:
+    if (i>0) and (i % interval == 0):
         # Convert to lists only for the portion we need for plotting
         current_history = {key: loss_history[key][:i+1].tolist() for key in loss_keys}
         plot_losses(f"demo1_losses.png", current_history)
