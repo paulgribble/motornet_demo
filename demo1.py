@@ -120,9 +120,9 @@ for i in tqdm(
         # Convert to lists only for the portion we need for plotting
         current_history = {key: loss_history[key][:i+1].tolist() for key in loss_keys}
         plot_losses(loss_history=current_history, fname=os.path.join(save_name, f"{save_name}_losses.png"))
-        plot_handpaths(episode_data=episode_data, fname=os.path.join(save_name, f"{save_name}_handpaths.png", figtitle=f"batch {i:04d} (n={batch_size})"))
+        plot_handpaths(episode_data=episode_data, fname=os.path.join(save_name, f"{save_name}_handpaths.png"), figtitle=f"batch {i:04d} (n={batch_size})")
         for j in range(4):  # plot 4 example trials
-            plot_signals(episode_data=episode_data, fname=os.path.join(save_name,f"{save_name}_signals_{j}.png", figtitle=f"batch {i:04d} (n={batch_size})", trial=j))
+            plot_signals(episode_data=episode_data, fname=os.path.join(save_name,f"{save_name}_signals_{j}.png"), figtitle=f"batch {i:04d} (n={batch_size})", trial=j)
 
 # Convert back to lists at the end for compatibility with your existing code
 for key in loss_keys:
