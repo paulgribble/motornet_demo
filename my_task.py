@@ -58,6 +58,9 @@ class ExperimentTask:
             # Random targets for training mode - batch with start_points conversion
 #            final_states  = self.effector.draw_random_uniform_states(batch_size)
 #            final_targets = self.effector.joint2cartesian(final_states).detach().cpu().numpy()
+
+            # get random start positions within arm workspace
+            # and find random end targets that are within [dmin, dmax] hand distance
             n = np.shape(start_points)[0]
             final_targets = np.zeros((n,4))
             for i in range(n):
