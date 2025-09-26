@@ -112,10 +112,10 @@ for i in tqdm(
     if (i>0) and (i % interval == 0):
         # Convert to lists only for the portion we need for plotting
         current_history = {key: loss_history[key][:i+1].tolist() for key in loss_keys}
-        plot_losses(current_history, f"demo1_losses.png")
-        plot_handpaths(episode_data, "demo1_handpaths.png", figtitle=f"batch {i:04d} (n={batch_size})")
+        plot_losses(loss_history=current_history, fname=f"demo1_losses.png")
+        plot_handpaths(episode_data=episode_data, fname="demo1_handpaths.png", figtitle=f"batch {i:04d} (n={batch_size})")
         for j in range(4):  # plot 4 example trials
-            plot_signals(episode_data, f"demo1_signals_{j}.png", figtitle=f"batch {i:04d} (n={batch_size})", trial=j)
+            plot_signals(episode_data=episode_data, fname=f"demo1_signals_{j}.png", figtitle=f"batch {i:04d} (n={batch_size})", trial=j)
 
 # Convert back to lists at the end for compatibility with your existing code
 for key in loss_keys:
@@ -139,9 +139,9 @@ episode_data = run_episode(env, task, policy, n_tg, n_t, device, k=FF_k)
 
 # Plot results
 
-plot_handpaths(episode_data)
+plot_handpaths(episode_data=episode_data, fname="demo1_handpaths_test.png")
 for i in range(n_tg):
-    plot_signals(episode_data, figtitle=f"trial {i}", trial=i)
+    plot_signals(episode_data=episode_data, fname=f"demo1_signals_test_{i}.png", figtitle=f"trial {i}", trial=i)
 
 # save episide data to a .pkl file
 with open("demo1_episode_data.pkl", "wb") as f:
