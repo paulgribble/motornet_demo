@@ -56,7 +56,7 @@ class ExperimentTask:
             final_targets = start_points + offsets
         else:
             # Random targets for training mode - batch with start_points conversion
-#            final_states = self.effector.draw_random_uniform_states(batch_size)
+#            final_states  = self.effector.draw_random_uniform_states(batch_size)
 #            final_targets = self.effector.joint2cartesian(final_states).detach().cpu().numpy()
             n = np.shape(start_points)[0]
             final_targets = np.zeros((n,4))
