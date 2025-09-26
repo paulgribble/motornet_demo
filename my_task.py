@@ -114,5 +114,5 @@ def generate_delay_time(delay_min, delay_max, delay_mode):#
 
 def get_xy_dist(hand1,hand2):
     # returns cartesian distance between two (xy) hand positions
-    return np.sqrt(np.sum((hand2-hand1)**2))
+    return np.sqrt(np.sum(np.square(hand2-hand1)))
 
