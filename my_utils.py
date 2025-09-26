@@ -79,7 +79,7 @@ def plot_losses(loss_history, fname=""):
         ax[0].plot(loss_history[l], alpha=0.5)
         ax[1].semilogy(loss_history[l], alpha=0.5)
     leg0 = ax[0].legend(loss_history.keys(), loc='upper right')
-    leg1 = ax[1].legend(loss_history.keys(), loc='lower right')
+    leg1 = ax[1].legend(loss_history.keys(), loc='lower center')
     for line in leg0.get_lines():
         line.set_linewidth(2)  # change this number as desired
     for line in leg1.get_lines():
@@ -239,8 +239,9 @@ def save_model(env, policy, losses, model_name, quiet=False):
         print(f"saved {losses_file}")
         print(f"saved {cfg_file}")
 
-def load_model(cfg_file, weight_file):
 
+def load_model(cfg_file, weight_file):
+    # load a previously trained model
     device = th.device("cpu")
     cfg = json.load(open(cfg_file, 'r'))
     dt = cfg['effector']['dt']
