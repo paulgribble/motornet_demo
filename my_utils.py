@@ -1,3 +1,4 @@
+import os
 import torch as th
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
@@ -218,9 +219,9 @@ def xy_to_joints(xy, l1, l2):
 
 
 def save_model(env, policy, losses, model_name, quiet=False):
-    weight_file = model_name + "_weights.pkl"
-    losses_file = model_name + "_losses.json"
-    cfg_file    = model_name + "_cfg.json"
+    weight_file = os.path.join(model_name, model_name + "_weights.pkl")
+    losses_file = os.path.join(model_name, model_name + "_losses.json")
+    cfg_file    = os.path.join(model_name, model_name + "_cfg.json")
 
     # save model weights
     th.save(policy.state_dict(), weight_file)
