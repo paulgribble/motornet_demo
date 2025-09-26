@@ -65,7 +65,7 @@ class ExperimentTask:
                 while not found:
                     tg_state = self.effector.draw_random_uniform_states(1)
                     tg_hand = self.effector.joint2cartesian(tg_state).detach().cpu().numpy()
-                    hdist = (get_xy_dist(tg_hand[0][0:2], start_points[i,0:2]))
+                    hdist = np.sqrt(np.sum(np.square(tg_hand[0][0:2] - start_points[i,0:2])))
                     found = (hdist>=dmin) and (hdist<=dmax)
                 final_targets[i,0:2] = tg_hand[0][0:2]
 
@@ -110,9 +110,4 @@ def generate_delay_time(delay_min, delay_max, delay_mode):#
         raise AttributeError
 
     return int(delay_time)
-
-
-def get_xy_dist(hand1,hand2):
-    # returns cartesian distance between two (xy) hand positions
-    return np.sqrt(np.sum(np.square(hand2-hand1)))
 
