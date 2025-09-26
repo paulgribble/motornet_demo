@@ -32,6 +32,9 @@ print('numpy version: ' + np.__version__)
 print('motornet version: ' + mn.__version__)
 
 
+save_name = "demo1" # name to use to save model, plots, etc
+
+
 ########## DEFINE A NEW MODEL AND TRAIN IT ON RANDOM REACHES ##########
 
 # use the cpu not the gpu
@@ -112,26 +115,28 @@ for i in tqdm(
     if (i>0) and (i % interval == 0):
         # Convert to lists only for the portion we need for plotting
         current_history = {key: loss_history[key][:i+1].tolist() for key in loss_keys}
-        plot_losses(loss_history=current_history, fname=f"demo1_losses.png")
-        plot_handpaths(episode_data=episode_data, fname="demo1_handpaths.png", figtitle=f"batch {i:04d} (n={batch_size})")
+        plot_losses(loss_history=current_history, fname=f"{save_name}_losses.png")
+        plot_handpaths(episode_data=episode_data, fname=f"{save_name}_handpaths.png", figtitle=f"batch {i:04d} (n={batch_size})")
         for j in range(4):  # plot 4 example trials
-            plot_signals(episode_data=episode_data, fname=f"demo1_signals_{j}.png", figtitle=f"batch {i:04d} (n={batch_size})", trial=j)
+            plot_signals(episode_data=episode_data, fname=f"{save_name}_signals_{j}.png", figtitle=f"batch {i:04d} (n={batch_size})", trial=j)
 
 # Convert back to lists at the end for compatibility with your existing code
 for key in loss_keys:
     loss_history[key] = loss_history[key].tolist()
 
-save_model(env, policy, loss_history, "demo1")
+save_model(env, policy, loss_history, save_name)
 
 
 
 ########## LOAD A MODEL AND TEST IT ON CENTER-OUT REACHES ##########
 
+save_name = "demo1"
+
 n_tg     = 8    # number of targets for center-out task
 sim_time = 3.00 # simulation time (seconds)
 FF_k     = 0    # FF strength
 
-env,task,policy,device = load_model("demo1_cfg.json", "demo1_weights.pkl")
+env,task,policy,device = load_model(f"{save_name}_cfg.json", f"{save_name}_weights.pkl")
 n_t = int(sim_time / env.dt) # simulation steps
 task.run_mode = 'test_center_out'
 inputs, targets, init_states = task.generate(n_tg, n_t)
@@ -139,11 +144,11 @@ episode_data = run_episode(env, task, policy, n_tg, n_t, device, k=FF_k)
 
 # Plot results
 
-plot_handpaths(episode_data=episode_data, fname="demo1_handpaths_test.png")
+plot_handpaths(episode_data=episode_data, fname="f{save_name}_handpaths_test.png")
 for i in range(n_tg):
-    plot_signals(episode_data=episode_data, fname=f"demo1_signals_test_{i}.png", figtitle=f"trial {i}", trial=i)
+    plot_signals(episode_data=episode_data, fname=f"{save_name}_signals_test_{i}.png", figtitle=f"trial {i}", trial=i)
 
 # save episide data to a .pkl file
-with open("demo1_episode_data.pkl", "wb") as f:
+with open("f{save_name}_episode_data.pkl", "wb") as f:
     pickle.dump(episode_data, f)
 
