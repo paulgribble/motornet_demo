@@ -56,11 +56,12 @@ n_t = int(ep_dur / env.effector.dt)
 
 # define the experimental task
 task = ExperimentTask(effector=env.effector)
-inputs, targets, init_states = task.generate(1, n_t)
+inputs, targets, init_states = task.generate(1, n_t) # get sample inputs so we know how many for policy
+n_task_inputs = inputs['inputs'].shape[2]
 
 # define the RNN
 n_units = 256
-policy = Policy(env.observation_space.shape[0] + inputs['inputs'].shape[2], n_units, env.n_muscles, device=device)
+policy = Policy(env.observation_space.shape[0] + n_task_inputs, n_units, env.n_muscles, device=device)
 
 # define the learning rule for updating RNN weights
 optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
@@ -139,16 +140,15 @@ FF_k     = 0    # FF strength
 env,task,policy,device = load_model(f"{save_name}_cfg.json", f"{save_name}_weights.pkl")
 n_t = int(sim_time / env.dt) # simulation steps
 task.run_mode = 'test_center_out'
-inputs, targets, init_states = task.generate(n_tg, n_t)
 episode_data = run_episode(env, task, policy, n_tg, n_t, device, k=FF_k)
 
 # Plot results
 
-plot_handpaths(episode_data=episode_data, fname="f{save_name}_handpaths_test.png")
+plot_handpaths(episode_data=episode_data, fname=f"{save_name}_handpaths_test.png")
 for i in range(n_tg):
     plot_signals(episode_data=episode_data, fname=f"{save_name}_signals_test_{i}.png", figtitle=f"trial {i}", trial=i)
 
 # save episide data to a .pkl file
-with open("f{save_name}_episode_data.pkl", "wb") as f:
+with open(f"{save_name}_episode_data.pkl", "wb") as f:
     pickle.dump(episode_data, f)
 

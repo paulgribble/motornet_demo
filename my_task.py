@@ -24,7 +24,7 @@ class ExperimentTask:
         angle = np.linspace(0,2*np.pi,n, endpoint=False)
         offsets = radius*np.array([np.cos(angle), np.sin(angle), np.zeros(n), np.zeros(n)]).T
 
-        # define initial states, delay range, and catch trial percentage
+        # define initial states (joint angles and vels), delay range, and catch trial percentage
         if self.run_mode == 'test_center_out': # test on center-out movements
             catch_chance = 0.     # no catch trials
             delay_tg = [0.5, 0.5] # target cue
@@ -48,7 +48,7 @@ class ExperimentTask:
         # Vectorized catch trial determination
         is_catch = np.random.rand(batch_size) < catch_chance
         
-        # Batch tensor conversions - compute all start points and final targets
+        # Compute start points and movement targets (hand positions)
         start_points = self.effector.joint2cartesian(th.tensor(init_states)).detach().cpu().numpy()
         
         if self.run_mode in ['test_center_out', 'train_center_out']:
@@ -66,34 +66,28 @@ class ExperimentTask:
             for i in range(n):
                 found = False
                 while not found:
-                    tg_state = self.effector.draw_random_uniform_states(1)
-                    tg_hand = self.effector.joint2cartesian(tg_state).detach().cpu().numpy()
-                    hdist = np.sqrt(np.sum(np.square(tg_hand[0][0:2] - start_points[i,0:2])))
-                    found = (hdist>=dmin) and (hdist<=dmax)
+                    tg_state = self.effector.draw_random_uniform_states(1) # joint angles, vels
+                    tg_hand = self.effector.joint2cartesian(tg_state).detach().cpu().numpy()  # hand xy
+                    hdist = np.sqrt(np.sum(np.square(tg_hand[0][0:2] - start_points[i,0:2]))) # dist from start
+                    found = (hdist>=dmin) and (hdist<=dmax) # within desired distance range
                 final_targets[i,0:2] = tg_hand[0][0:2]
 
         # Create arrays for targets (for loss function) and inputs (for RNN)
-        targets = np.zeros((batch_size, n_timesteps, start_points.shape[1]))
-        inputs = np.zeros(shape=(batch_size, n_timesteps, 3))
+        targets = np.zeros((batch_size, n_timesteps, start_points.shape[1])) # initialize array to zeros
+        inputs = np.zeros(shape=(batch_size, n_timesteps, 3))                # initialize array to zeros
         for i in range(batch_size):
+            # inputs to RNN
+            inputs[ i, :delay_tg_times[i], 0:2] = start_points[i, 0:2] # RNN always sees start tgt
+            inputs[ i, delay_tg_times[i]:, 0:2] = final_targets[i,0:2] # and then final target
+            inputs[ i, :delay_go_times[i],   2] = 0.0                  # and don't go until delay_go
+            # targets for loss function calculation
+            targets[i, :delay_go_times[i],   :] = start_points[i]
             if not is_catch[i]:
-                # inputs to RNN
-                inputs[ i, :delay_tg_times[i], 0:2] = start_points[i, 0:2]
-                inputs[ i, delay_tg_times[i]:, 0:2] = final_targets[i,0:2]
-                inputs[ i, :delay_go_times[i],   2] = 0.0
-                inputs[ i, delay_go_times[i]:,   2] = 1.0
-                # targets for loss function calculation
-                targets[i, :delay_go_times[i],   :] = start_points[i]
-                targets[i, delay_go_times[i]:,   :] = final_targets[i]
+                inputs[ i, delay_go_times[i]:,   2] = 1.0               # go!
+                targets[i, delay_go_times[i]:,   :] = final_targets[i]  # for loss function: we want to go to tgt
             elif is_catch[i]:
-                # inputs to RNN
-                inputs[ i, :delay_tg_times[i], 0:2] = start_points[i, 0:2]
-                inputs[ i, delay_tg_times[i]:, 0:2] = final_targets[i,0:2]
-                inputs[ i, :delay_go_times[i],   2] = 0.0
-                inputs[ i, delay_go_times[i]:,   2] = 0.0
-                # targets for loss function calculation
-                targets[i, :delay_go_times[i],   :] = start_points[i]
-                targets[i, delay_go_times[i]:,   :] = start_points[i]
+                inputs[ i, delay_go_times[i]:,   2] = 0.0               # don't go!
+                targets[i, delay_go_times[i]:,   :] = start_points[i]   # for loss function: we want to stay at start
         
         # Add vectorized noise to all inputs at once
         noise = np.random.normal(loc=0., scale=1e-3, size=(batch_size, n_timesteps, 3))
@@ -101,7 +95,6 @@ class ExperimentTask:
 
         all_inputs = {"inputs": inputs}
         return [all_inputs, targets, init_states]
-        #return [inputs, targets, init_states]
 
 
 def generate_delay_time(delay_min, delay_max, delay_mode):#
