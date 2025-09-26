@@ -173,6 +173,8 @@ def plot_signals(episode_data, fname="", figtitle="", trial=0, coord="xy"):
     for i in range(6):
         ax[i].spines['top'].set_visible(False)
         ax[i].spines['right'].set_visible(False)
+        ax[i].set_xlim([0,np.shape(xy)[1]])
+        ax[i].set_xticks(np.arange(0, np.shape(xy)[1], 50))
         if i<4:
             ax[i].set_xticks([])
             ax[i].tick_params(axis='x', length=0)
