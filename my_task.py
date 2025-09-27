@@ -39,7 +39,15 @@ class ExperimentTask:
             catch_chance = 0.5    # 50% no-go catch trials
             delay_tg = self.delay_tg
             delay_go = self.delay_go
-            init_states = self.effector.draw_random_uniform_states(batch_size).detach().cpu().numpy() # random initial state
+#            # define initial joint angles
+#            init_states = self.effector.draw_random_uniform_states(batch_size).detach().cpu().numpy() # random initial state
+            # define initial joint angles within some bounds
+            joints_min = np.array([20, 20])  * np.pi / 180 # shoulder, elbow (rad)
+            joints_max= np.array([110, 110]) * np.pi / 180 # shoulder, elbow (rad)
+            rnd = np.random.rand(batch_size,2)
+            pos = (joints_max-joints_min) * rnd + joints_min
+            vel = np.zeros((batch_size,2))
+            init_states = np.hstack([pos, vel])
 
         # Vectorized delay time generation
         delay_tg_times = np.random.uniform(delay_tg[0] / self.dt, delay_tg[1] / self.dt, batch_size).astype(int)
@@ -55,12 +63,11 @@ class ExperimentTask:
             # Center-out targets: start_point + offset for each trial
             final_targets = start_points + offsets
         else:
-            # Random targets for training mode - batch with start_points conversion
+#            # Random targets for training mode - batch with start_points conversion
 #            final_states  = self.effector.draw_random_uniform_states(batch_size)
 #            final_targets = self.effector.joint2cartesian(final_states).detach().cpu().numpy()
 
-            # get random start positions within arm workspace
-            # and find random end targets that are within [dmin, dmax] hand distance
+            # set random end targets that are within [dmin, dmax] hand distance from start_points
             n = np.shape(start_points)[0]
             final_targets = np.zeros((n,4))
             for i in range(n):
