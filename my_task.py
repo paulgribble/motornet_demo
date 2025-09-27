@@ -77,6 +77,7 @@ class ExperimentTask:
                     tg_hand = self.effector.joint2cartesian(tg_state).detach().cpu().numpy()  # hand xy
                     hdist = np.sqrt(np.sum(np.square(tg_hand[0][0:2] - start_points[i,0:2]))) # dist from start
                     found = (hdist>=dmin) and (hdist<=dmax) # within desired distance range
+                    found = found and (tg_hand[0][1] > 0)   # hand not behind shoulder
                 final_targets[i,0:2] = tg_hand[0][0:2]
 
         # Create arrays for targets (for loss function) and inputs (for RNN)
