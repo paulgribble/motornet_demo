@@ -73,12 +73,13 @@ class ExperimentTask:
             for i in range(n):
                 found = False
                 while not found:
-                    tg_state = self.effector.draw_random_uniform_states(1) # joint angles, vels
-                    tg_hand = self.effector.joint2cartesian(tg_state).detach().cpu().numpy()  # hand xy
-                    hdist = np.sqrt(np.sum(np.square(tg_hand[0][0:2] - start_points[i,0:2]))) # dist from start
+                    tg_state = self.effector.draw_random_uniform_states(1).detach().cpu().numpy()[0] # joint angles, vels
+                    tg_hand = self.effector.joint2cartesian(tg_state).detach().cpu().numpy()[0]  # hand xy
+                    hdist = np.sqrt(np.sum(np.square(tg_hand[0:2] - start_points[i,0:2]))) # dist from start
                     found = (hdist>=dmin) and (hdist<=dmax) # within desired distance range
-                    found = found and (tg_hand[0][1] > 0)   # hand not behind shoulder
-                final_targets[i,0:2] = tg_hand[0][0:2]
+                    found = found and all(tg_state[0:2] > joints_min) and all(tg_state[0:2] < joints_max) # within joint range
+                    found = found and (tg_hand[1] > 0)   # hand not behind shoulder
+                final_targets[i,0:2] = tg_hand[0:2]
 
         # Create arrays for targets (for loss function) and inputs (for RNN)
         targets = np.zeros((batch_size, n_timesteps, start_points.shape[1])) # initialize array to zeros
