@@ -2,6 +2,7 @@ import numpy as np
 import torch as th
 
 # Here we are defining the Task. This is what we update to change the tasks the network has to learn.
+
 class ExperimentTask:
     def __init__(self, effector, **kwargs):
         self.effector = effector
