@@ -13,9 +13,9 @@ loss_weights = {
 
 def calculate_loss(episode_data):
 
-    xy          = episode_data['xy'][:,:,0:2]
+    xy          = episode_data['xy'][:,:,:2]
     speed       = episode_data['xy'][:,:,2:]
-    tg          = episode_data['targets'][:,:,0:2]
+    tg          = episode_data['targets'][:,:,:2]
     force       = episode_data['force']
     hidden      = episode_data['hidden']
 
