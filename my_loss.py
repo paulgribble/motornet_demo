@@ -12,13 +12,11 @@ loss_weights = {
     }
 
 def calculate_loss(episode_data):
-    # Pre-compute common operations
+
     speed_data  = episode_data['xy'][:,:,2:]
     jerk_data   = th.diff(speed_data,             n=2, dim=1)
     force_diff  = th.diff(episode_data['force'],  n=1, dim=1)
     hidden_diff = th.diff(episode_data['hidden'], n=2, dim=1)
-
-    # Calculate losses with gradients enabled
 
     xy = episode_data['xy'][:,:,0:2]
     tg = episode_data['targets'][:,:,0:2]
