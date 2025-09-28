@@ -19,8 +19,20 @@ def calculate_loss(episode_data):
     hidden_diff = th.diff(episode_data['hidden'], n=2, dim=1)
 
     # Calculate losses with gradients enabled
+
+    xy = episode_data['xy'][:,:,0:2]
+    tg = episode_data['targets'][:,:,0:2]
+    pos_err = xy - tg
+
+    # set to zero pos_err during desired movement interval
+    des_mov_time = 0.500 # seconds
+    des_mov_step = int(des_mov_time / episode_data['dt'])
+    go_steps = episode_data['delay_go_times']
+    go_mask = go_steps[:,None] + np.arange(des_mov_step)
+    pos_err[:,go_mask,:] = 0.0
+
     losses = {
-        'position'         : loss_weights['position']          * th.mean(th.abs(episode_data['xy'][:,:,0:2] - episode_data['targets'][:,:,0:2])),
+        'position'         : loss_weights['position']          * th.mean(th.abs(pos_err)),
         'speed'            : loss_weights['speed']             * th.mean(th.square(speed_data)),
         'jerk'             : loss_weights['jerk']              * th.mean(th.square(jerk_data)),
         'muscle'           : loss_weights['muscle']            * th.mean(episode_data['force']),

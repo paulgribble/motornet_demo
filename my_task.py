@@ -104,7 +104,7 @@ class ExperimentTask:
         inputs += noise
 
         all_inputs = {"inputs": inputs}
-        return [all_inputs, targets, init_states]
+        return [all_inputs, targets, init_states, delay_go_times]
 
 
 def generate_delay_time(delay_min, delay_max, delay_mode):#

@@ -53,7 +53,7 @@ n_t = int(ep_dur / env.effector.dt)
 
 # define the experimental task
 task = ExperimentTask(effector=env.effector)
-inputs, targets, init_states = task.generate(1, n_t) # get sample inputs so we know how many for policy
+inputs, targets, init_states, _ = task.generate(1, n_t) # get sample inputs so we know how many for policy
 n_task_inputs = inputs['inputs'].shape[2]
 
 # define the RNN
