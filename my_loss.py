@@ -14,7 +14,7 @@ loss_weights = {
 def calculate_loss(episode_data):
 
     speed       = episode_data['xy'][:,:,2:]
-    jerk        = th.diff(speed_data,             n=2, dim=1)
+    jerk        = th.diff(speed,                  n=2, dim=1)
     force_diff  = th.diff(episode_data['force'],  n=1, dim=1)
     hidden_diff = th.diff(episode_data['hidden'], n=2, dim=1)
 
