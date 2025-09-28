@@ -3,7 +3,7 @@ import torch as th
 
 loss_weights = {
     'position'          : 1e+3,
-    'speed'             : 0e+0, # 5e+1
+    'speed'             : 1e+1,
     'jerk'              : 1e+4,
     'muscle'            : 1e-1,
     'muscle_derivative' : 1e+0,
@@ -25,11 +25,11 @@ def calculate_loss(episode_data):
     pos_err = xy - tg
 
     # set to zero pos_err during desired movement interval
-    des_mov_time = 0.500 # seconds
-    des_mov_step = int(des_mov_time / episode_data['dt'])
-    go_steps = episode_data['delay_go_times']
-    go_mask = go_steps[:,None] + np.arange(des_mov_step)
-    pos_err[:,go_mask,:] = 0.0
+    # des_mov_time = 0.500 # seconds
+    # des_mov_step = int(des_mov_time / episode_data['dt'])
+    # go_steps = episode_data['delay_go_times']
+    # go_mask = go_steps[:,None] + np.arange(des_mov_step)
+    # pos_err[:,go_mask,:] = 0.0
 
     losses = {
         'position'         : loss_weights['position']          * th.mean(th.abs(pos_err)),
