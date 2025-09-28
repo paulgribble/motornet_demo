@@ -36,5 +36,3 @@ def calculate_loss(episode_data):
     losses['total'] = sum(losses.values())
     return losses
 
-
-
