@@ -13,6 +13,8 @@ def calculate_loss(episode_data):
         'hidden_derivative': 1e+2 * th.mean(th.square(th.diff(episode_data['hidden'],n=2,dim=1)))
     }
     
-    losses['total'] = sum(losses.values())
+    losses['total'] = losses['position'] + losses['speed'] + losses['jerk'] + \
+                      losses['muscle'] + losses['muscle_derivative'] + \
+                      losses['hidden'] + losses['hidden_derivative']
     return losses
 
