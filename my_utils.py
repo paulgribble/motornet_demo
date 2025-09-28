@@ -264,7 +264,7 @@ def load_model(cfg_file, weight_file):
     w = th.load(weight_file, weights_only=True)
     n_hidden = int(w['gru.weight_ih_l0'].shape[0]/3)
     task = ExperimentTask(effector=env.effector)
-    inputs, _, _ = task.generate(1, 1) # just to get input shape
+    inputs, _, _, _ = task.generate(1, 1) # just to get input shape
     policy = Policy(env.observation_space.shape[0] + inputs['inputs'].shape[2], n_hidden, env.n_muscles, device=device)
     policy.load_state_dict(w)
     return env, task, policy, device

@@ -66,7 +66,7 @@ optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
 
 # Main training loop
 
-n_batch       =  5000
+n_batch       =  10
 interval      =   100   # for intermediate plots
 batch_size    =    64
 FF_k          =     0   # force-field strength
@@ -140,9 +140,11 @@ n_tg     = 8    # number of targets for center-out task
 sim_time = 3.00 # simulation time (seconds)
 FF_k     = 0    # FF strength
 
+print(f"loading model {save_name}")
 env,task,policy,device = load_model(os.path.join(save_name,f"{save_name}_cfg.json"), os.path.join(save_name,f"{save_name}_weights.pkl"))
 n_t = int(sim_time / env.dt) # simulation steps
 task.run_mode = 'test_center_out'
+print(f"simulating {task.run_mode}")
 episode_data = run_episode(env, task, policy, n_tg, n_t, device, k=FF_k)
 
 # Plot results
