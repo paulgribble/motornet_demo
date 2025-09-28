@@ -16,6 +16,9 @@ def calculate_loss(episode_data):
     xy          = episode_data['xy'][:,:,0:2]
     speed       = episode_data['xy'][:,:,2:]
     tg          = episode_data['targets'][:,:,0:2]
+    force       = episode_data['force']
+    hidden      = episode_data['hidden']
+
     jerk        = th.diff(speed,                  n=2, dim=1)
     force_diff  = th.diff(episode_data['force'],  n=1, dim=1)
     hidden_diff = th.diff(episode_data['hidden'], n=2, dim=1)
@@ -24,9 +27,9 @@ def calculate_loss(episode_data):
         'position'         : loss_weights['position']          * th.mean(th.abs(xy - tg)),
         'speed'            : loss_weights['speed']             * th.mean(th.square(speed)),
         'jerk'             : loss_weights['jerk']              * th.mean(th.square(jerk)),
-        'muscle'           : loss_weights['muscle']            * th.mean(episode_data['force']),
+        'muscle'           : loss_weights['muscle']            * th.mean(force),
         'muscle_derivative': loss_weights['muscle_derivative'] * th.mean(th.square(force_diff)),
-        'hidden'           : loss_weights['hidden']            * th.mean(th.square(episode_data['hidden'])),
+        'hidden'           : loss_weights['hidden']            * th.mean(th.square(hidden)),
         'hidden_derivative': loss_weights['hidden_derivative'] * th.mean(th.square(hidden_diff))
     }
     
