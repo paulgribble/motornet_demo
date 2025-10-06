@@ -39,3 +39,10 @@ source .venv/bin/activate
 
 Doing `brew install libomp` will help make things stable when doing parallel training especially with compile directives.
 
+## Example Training
+
+Using `n_batch=10000`:
+
+![](demo1_handpaths_test.png)
+
+![](demo1_signals_test_7.png)
