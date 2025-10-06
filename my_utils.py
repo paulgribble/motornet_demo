@@ -61,17 +61,17 @@ def run_episode(env, task, policy, batch_size, n_t, device, k = 0, *args, **kwar
         all_joint.append(info['states']['joint'][:, None, :])
 
     return {
-        'xy': th.cat(xy, dim=1),
-        'hidden' : th.cat(all_hidden, dim=1),
-        'actions' : th.cat(all_actions, dim=1),
-        'muscle' : th.cat(all_muscle, dim=1),
-        'force' : th.cat(all_force, dim=1),
-        'targets' : th.cat(all_targets, dim=1),
-        'inp' : th.cat(all_inp, dim=1),
-        'joint' : th.cat(all_joint, dim=1),
-        'l1'    : env.skeleton.l1,
-        'l2'    : env.skeleton.l2,
-        'dt'    : env.dt,
+        'xy'             : th.cat(xy, dim=1),
+        'hidden'         : th.cat(all_hidden, dim=1),
+        'actions'        : th.cat(all_actions, dim=1),
+        'muscle'         : th.cat(all_muscle, dim=1),
+        'force'          : th.cat(all_force, dim=1),
+        'targets'        : th.cat(all_targets, dim=1),
+        'inp'            : th.cat(all_inp, dim=1),
+        'joint'          : th.cat(all_joint, dim=1),
+        'l1'             : env.skeleton.l1,
+        'l2'             : env.skeleton.l2,
+        'dt'             : env.dt,
         'delay_go_times' : delay_go_times
     }
 

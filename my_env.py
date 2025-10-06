@@ -70,7 +70,7 @@ class ExperimentEnv(mn.environment.Environment):
     self.update_obs_buffer(action=action)
 
     obs_as_list = [
-      self.obs_buffer["vision"][0],  # oldest element
+      self.obs_buffer["vision"][0],           # oldest element
       self.obs_buffer["proprioception"][0],   # oldest element
       ]
     obs = th.cat(obs_as_list, dim=-1)

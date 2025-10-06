@@ -14,7 +14,7 @@ def calculate_loss(episode_data):
     }
     
     losses['total'] = losses['position'] + losses['speed'] + losses['jerk'] + \
-                      losses['muscle'] + losses['muscle_derivative'] + \
-                      losses['hidden'] + losses['hidden_derivative']
+                      losses['muscle']   + losses['muscle_derivative'] + \
+                      losses['hidden']   + losses['hidden_derivative']
     return losses
 
