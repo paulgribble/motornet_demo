@@ -64,7 +64,9 @@ policy = Policy(env.observation_space.shape[0] + n_task_inputs, n_units, env.n_m
 optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
 
 
-# Main training loop
+# --------------------------------------------------
+# TRAINING LOOP
+# --------------------------------------------------
 
 n_batch       = 10000
 interval      =   100   # for intermediate plots
@@ -79,14 +81,14 @@ if not os.path.exists(save_name):
 
 # Pre-allocate numpy arrays instead of lists for better memory efficiency
 loss_history = {
-    "total": np.zeros(n_batch, dtype=np.float32),
-    "position": np.zeros(n_batch, dtype=np.float32),
-    "speed": np.zeros(n_batch, dtype=np.float32),
-    "jerk": np.zeros(n_batch, dtype=np.float32),
-    "muscle": np.zeros(n_batch, dtype=np.float32),
-    "muscle_derivative": np.zeros(n_batch, dtype=np.float32),
-    "hidden": np.zeros(n_batch, dtype=np.float32),
-    "hidden_derivative": np.zeros(n_batch, dtype=np.float32),
+    "total"             : np.zeros(n_batch, dtype=np.float32),
+    "position"          : np.zeros(n_batch, dtype=np.float32),
+    "speed"             : np.zeros(n_batch, dtype=np.float32),
+    "jerk"              : np.zeros(n_batch, dtype=np.float32),
+    "muscle"            : np.zeros(n_batch, dtype=np.float32),
+    "muscle_derivative" : np.zeros(n_batch, dtype=np.float32),
+    "hidden"            : np.zeros(n_batch, dtype=np.float32),
+    "hidden_derivative" : np.zeros(n_batch, dtype=np.float32),
 }
 
 # Optimize loss keys for faster iteration
@@ -102,37 +104,39 @@ for i in tqdm(
     total    = n_batch, 
 ):
     
-    task.run_mode = 'train'
-    episode_data = run_episode(env, task, policy, batch_size, n_t, device, k=FF_k)
-    loss = calculate_loss(episode_data)
-    loss['total'].backward()
-    th.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=1)
-    optimizer.step()
-    optimizer.zero_grad(set_to_none=True)  # More memory efficient
+    task.run_mode = 'train'                                      # random reaches in workspace
+    episode_data = run_episode(env, task, policy, batch_size, n_t, device, k=FF_k) # run the batch forwards
+    loss = calculate_loss(episode_data)                          # compute loss
+    loss['total'].backward()                                     # propagate loss backwards to compute gradients
+    th.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=1) # so that gradients don't get out of hand
+    optimizer.step()                                             # adjust network weights
+    optimizer.zero_grad(set_to_none=True)                        # zero out the gradients
     
-    # Track ALL losses efficiently - vectorized assignment with no gradients
+    # Track losses
     with th.no_grad():  # Don't need gradients for loss tracking
         for key in loss_keys:
             loss_history[key][i] = loss[key].item()
     
-    # Plotting optimizations while keeping same frequency
+    # plot some things every once in a while
     if (i>0) and (i % interval == 0):
-        # Convert to lists only for the portion we need for plotting
+        # Convert to lists the portions we need for plotting
         current_history = {key: loss_history[key][:i+1].tolist() for key in loss_keys}
         plot_losses(loss_history=current_history, fname=os.path.join(save_name, f"{save_name}_losses.png"))
         plot_handpaths(episode_data=episode_data, fname=os.path.join(save_name, f"{save_name}_handpaths.png"), figtitle=f"batch {i:04d} (n={batch_size})")
-        for j in range(4):  # plot 4 example trials
+        for j in range(4):  # plot first 4 trials of batch
             plot_signals(episode_data=episode_data, fname=os.path.join(save_name,f"{save_name}_signals_{j}.png"), figtitle=f"batch {i:04d} (n={batch_size})", trial=j)
 
-# Convert back to lists at the end for compatibility with your existing code
+# Convert back to lists
 for key in loss_keys:
     loss_history[key] = loss_history[key].tolist()
 
+# save the model to disk
 save_model(env, policy, loss_history, save_name)
 
 
-
-########## LOAD A MODEL AND TEST IT ON CENTER-OUT REACHES ##########
+# --------------------------------------------------
+# LOAD A MODEL AND TEST IT ON CENTER-OUT REACHES
+# --------------------------------------------------
 
 save_name = "demo1"
 
@@ -142,18 +146,19 @@ FF_k     = 0    # FF strength
 
 print(f"loading model {save_name}")
 env,task,policy,device = load_model(os.path.join(save_name,f"{save_name}_cfg.json"), os.path.join(save_name,f"{save_name}_weights.pkl"))
-n_t = int(sim_time / env.dt) # simulation steps
-task.run_mode = 'test_center_out'
+
+n_t = int(sim_time / env.dt)           # number of simulation steps
+task.run_mode = 'test_center_out'      # center-out reaches
+
 print(f"simulating {task.run_mode}")
-episode_data = run_episode(env, task, policy, n_tg, n_t, device, k=FF_k)
+episode_data = run_episode(env, task, policy, n_tg, n_t, device, k=FF_k) # run the batch forwards
 
 # Plot results
-
 plot_handpaths(episode_data=episode_data, fname=os.path.join(save_name,f"{save_name}_handpaths_test.png"))
 for i in range(n_tg):
     plot_signals(episode_data=episode_data, fname=os.path.join(save_name,f"{save_name}_signals_test_{i}.png"), figtitle=f"trial {i}", trial=i)
 
-# save episide data to a .pkl file
+# save episide data to a .pkl file on disk
 with open(os.path.join(save_name,f"{save_name}_episode_data.pkl"), "wb") as f:
     pickle.dump(episode_data, f)
 
