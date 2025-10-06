@@ -43,6 +43,6 @@ Doing `brew install libomp` will help make things stable when doing parallel tra
 
 Using `n_batch=10000`:
 
-![](demo1_handpaths_test.png)
+![](demo1/demo1_handpaths_test.png)
 
-![](demo1_signals_test_7.png)
+![](demo1/demo1_signals_test_7.png)
