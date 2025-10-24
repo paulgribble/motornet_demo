@@ -63,9 +63,8 @@ policy = Policy(env.observation_space.shape[0] + n_task_inputs, n_units, env.n_m
 # define the learning rule for updating RNN weights
 optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
 
-
 # --------------------------------------------------
-# TRAINING LOOP
+# TRAINING 
 # --------------------------------------------------
 
 n_batch       = 10000
@@ -95,6 +94,19 @@ loss_history = {
 loss_keys = ["total", "position", "speed", "jerk", 
              "muscle", "muscle_derivative", "hidden", "hidden_derivative"]
 
+# warm start to get compiling sorted out
+print(f"warm start for compiling ...")
+for i in range(5):
+    task.run_mode = 'train'                                      # random reaches in workspace
+    episode_data = run_episode(env, task, policy, batch_size, n_t, device, k=FF_k) # run the batch forwards
+    loss = calculate_loss(episode_data)                          # compute loss
+    loss['total'].backward()                                     # propagate loss backwards to compute gradients
+    th.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=1) # so that gradients don't get out of hand
+    optimizer.step()                                             # adjust network weights
+    optimizer.zero_grad(set_to_none=True)                        # zero out the gradients
+
+# main training loop
+print(f"main training loop")
 print(f"simulating {ep_dur} second movements using {n_t} time points")
 
 for i in tqdm(
@@ -135,8 +147,10 @@ save_model(env, policy, loss_history, save_name)
 
 
 # --------------------------------------------------
-# LOAD A MODEL AND TEST IT ON CENTER-OUT REACHES
+# TESTING
 # --------------------------------------------------
+
+# LOAD A MODEL AND TEST IT ON CENTER-OUT REACHES
 
 save_name = "demo1"
 
