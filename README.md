@@ -18,13 +18,12 @@ Assumption: you have python3.12 installed. On MacOS:
 brew install python@3.12
 ```
 
-I use `pip` to organize Python environments.
+I use `uv` to organize Python environments.
+
+One-time setup:
 
 ```{shell}
-python3.12 -m venv .venv
-source .venv/bin/activate
-python3.12 -m pip install -U pip
-pip install -r requirements.txt --no-cache-dir --force
+bash setup.sh
 ```
 
 ## Starting point
@@ -32,7 +31,7 @@ pip install -r requirements.txt --no-cache-dir --force
 After you install motornet and the libraries above, activate the venv:
 
 ```{shell}
-source .venv/bin/activate
+uv run python demo1.py
 ```
 
 ## Parallel computing on Apple Silicon
