@@ -10,7 +10,7 @@ def calculate_loss(episode_data):
         'muscle'           : 2e-1 * th.mean(episode_data['force']),
         'muscle_derivative': 1e+0 * th.mean(th.square(th.diff(episode_data['force'],n=1,dim=1))),
         'hidden'           : 2e+2 * th.mean(th.square(episode_data['hidden'])),
-        'hidden_derivative': 1e+2 * th.mean(th.square(th.diff(episode_data['hidden'],n=2,dim=1)))
+        'hidden_derivative': 1e+2 * th.mean(th.square(th.diff(episode_data['hidden'],n=2,dim=1))) # spectral
     }
     
     losses['total'] = losses['position'] + losses['speed'] + losses['jerk'] + \
