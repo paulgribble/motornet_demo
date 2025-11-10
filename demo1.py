@@ -44,7 +44,7 @@ effector = mn.effector.RigidTendonArm26(muscle=mn.muscle.RigidTendonHillMuscle()
 # initialize the experimental environment
 ep_dur = 3.00 # duration of each simulation (seconds)
 env = ExperimentEnv(effector=effector, max_ep_duration=ep_dur,
-                    proprioception_delay=0.01, vision_delay=0.07,
+                    proprioception_delay=0.02, vision_delay=0.07,
                     proprioception_noise=1e-3, vision_noise=1e-3, action_noise=1e-4
                     )
 
