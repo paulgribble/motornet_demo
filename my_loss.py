@@ -3,7 +3,6 @@ import torch as th
 
 def calculate_loss(episode_data):
     # from Michaels et al. (2025) Nature https://doi.org/10.1038/s41586-025-09690-9
-
     losses = {
         'position'         : 1e+3 * th.mean(th.abs(episode_data['xy'][:,:,:2] - episode_data['targets'][:,:,:2])),
         'speed'            : 2e+2 * th.mean(th.square(episode_data['xy'][:,:,2:])),
@@ -13,7 +12,6 @@ def calculate_loss(episode_data):
         'hidden'           : 1e-1 * th.mean(th.square(episode_data['hidden'])),
         'hidden_derivative': 1e+4 * th.mean(th.square(th.diff(episode_data['hidden'],n=2,dim=1))) # spectral
     }
-    
     losses['total'] = losses['position'] + losses['speed'] + losses['jerk'] + \
                       losses['muscle']   + losses['muscle_derivative'] + \
                       losses['hidden']   + losses['hidden_derivative']
@@ -31,7 +29,6 @@ def calculate_loss_orig(episode_data):
         'hidden'           : 2e+2 * th.mean(th.square(episode_data['hidden'])),
         'hidden_derivative': 1e+2 * th.mean(th.square(th.diff(episode_data['hidden'],n=2,dim=1))) # spectral
     }
-    
     losses['total'] = losses['position'] + losses['speed'] + losses['jerk'] + \
                       losses['muscle']   + losses['muscle_derivative'] + \
                       losses['hidden']   + losses['hidden_derivative']
