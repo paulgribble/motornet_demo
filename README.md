@@ -12,15 +12,15 @@ simple demo of training a motornet system
 
 ## Installing motornet
 
-Assumption: you have python3.12 installed. On MacOS:
+Assumption: you have python3.12 and the [uv](https://docs.astral.sh/uv/) python package manager installed.
+
+On MacOS use the [Homebrew](https://brew.sh) package manager:
 
 ```{shell}
-brew install python@3.12
+brew install python@3.12 uv
 ```
 
-I use `uv` to organize Python environments.
-
-One-time setup:
+Then a one-time setup for motornet_demo:
 
 ```{shell}
 bash setup.sh
@@ -28,7 +28,7 @@ bash setup.sh
 
 ## Starting point
 
-After you install motornet and the libraries above, activate the venv:
+After you setup as above, you can run the `demo1.py` script like this:
 
 ```{shell}
 uv run python demo1.py
@@ -38,9 +38,7 @@ uv run python demo1.py
 
 Doing `brew install libomp` will help make things stable when doing parallel training especially with compile directives.
 
-## Example Training
-
-Using `n_batch=10000`:
+## Example Results
 
 ![](demo1/demo1_handpaths_test.png)
 
