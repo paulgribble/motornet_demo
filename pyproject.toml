@@ -16,6 +16,7 @@ dependencies = [
   "fsspec==2025.9.0",
   "gymnasium==1.2.0",
   "ipykernel>=7.1.0",
+  "ipympl>=0.9.8",
   "ipython==9.5.0",
   "ipython_pygments_lexers==1.1.1",
   "jedi==0.19.2",
