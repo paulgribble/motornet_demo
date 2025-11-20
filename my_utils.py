@@ -117,7 +117,7 @@ def plot_handpaths(episode_data, fname="", figtitle=""):
         fig.savefig(fname)
         plt.close(fig)
     else:
-        plt.show()
+        plt.show();
         return fig,ax
 
 def plot_signals(episode_data, fname="", figtitle="", trial=0, coord="xy"):
