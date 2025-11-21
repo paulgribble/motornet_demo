@@ -3,3 +3,4 @@ __pycache__/
 my_model/
 models/
 .venv/
+uv.lock
