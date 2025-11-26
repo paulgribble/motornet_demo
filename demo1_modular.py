@@ -84,7 +84,7 @@ optimizer = th.optim.Adam(policy.parameters(), lr=1e-3)
 
 n_batch       = 10000
 interval      =   100   # for intermediate plots
-batch_size    =    64
+batch_size    =    32
 FF_k          =     0   # force-field strength
 save_name     = "demo1_modular" # name to use to save model, plots, etc
 
