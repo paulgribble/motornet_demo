@@ -14,7 +14,7 @@ from tqdm import tqdm
 import pickle
 
 from my_policy import Policy         # the RNN
-from my_loss   import calculate_loss # the loss function
+from my_loss   import calculate_loss_michaels as calculate_loss # the loss function
 from my_env    import ExperimentEnv  # the environment
 from my_task   import ExperimentTask # the task
 from my_utils  import run_episode    # run a batch of simulations

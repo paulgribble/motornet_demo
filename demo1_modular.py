@@ -13,8 +13,8 @@ import motornet as mn
 from tqdm import tqdm
 import pickle
 
-from mehrdad_policies import ModularPolicyGRU         # the modular RNN
-from my_loss   import calculate_loss_mehrdad # the loss function
+from my_policy import ModularPolicyGRU       # the modular RNN
+from my_loss   import calculate_loss_michaels as calculate_loss # the loss function
 from my_env    import ExperimentEnv  # the environment
 from my_task   import ExperimentTask # the task
 from my_utils  import run_episode    # run a batch of simulations
@@ -122,7 +122,7 @@ for i in tqdm(
     
     task.run_mode = 'train'                                      # random reaches in workspace
     episode_data = run_episode(env, task, policy, batch_size, n_t, device, k=FF_k) # run the batch forwards
-    loss = calculate_loss_mehrdad(episode_data)                  # calculate loss
+    loss = calculate_loss(episode_data)                  # calculate loss
     loss['total'].backward()                                     # propagate loss backwards to compute gradients
     th.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=1) # so that gradients don't get out of hand
     optimizer.step()                                             # adjust network weights

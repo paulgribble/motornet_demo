@@ -1,7 +1,7 @@
 import numpy as np
 import torch as th
 
-def calculate_loss(episode_data):
+def calculate_loss_michaels(episode_data):
     # from Michaels et al. (2025) Nature https://doi.org/10.1038/s41586-025-09690-9
     losses = {
         'position'         : 1e+3 * th.mean(th.abs(episode_data['xy'][:,:,:2] - episode_data['targets'][:,:,:2])),
