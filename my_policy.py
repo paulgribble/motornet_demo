@@ -1,7 +1,9 @@
 import torch as th
+import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 
-class Policy(th.nn.Module):
+class Policy(nn.Module):
     
     def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, device, freeze_output_layer=False, learn_h0=True):
         super().__init__()
@@ -9,9 +11,9 @@ class Policy(th.nn.Module):
         self.hidden_dim = hidden_dim
         self.n_layers = 1
 
-        self.gru = th.nn.GRU(input_dim, hidden_dim, 1, batch_first=True)
-        self.fc = th.nn.Linear(hidden_dim, output_dim)
-        self.sigmoid = th.nn.Sigmoid()
+        self.gru = nn.GRU(input_dim, hidden_dim, 1, batch_first=True)
+        self.fc = nn.Linear(hidden_dim, output_dim)
+        self.sigmoid = nn.Sigmoid()
 
         if freeze_output_layer:
             for param in self.fc.parameters():
@@ -20,17 +22,17 @@ class Policy(th.nn.Module):
         # the default initialization in torch isn't ideal
         for name, param in self.named_parameters():
             if name == "gru.weight_ih_l0":
-                th.nn.init.xavier_uniform_(param)
+                nn.init.xavier_uniform_(param)
             elif name == "gru.weight_hh_l0":
-                th.nn.init.orthogonal_(param)
+                nn.init.orthogonal_(param)
             elif name == "gru.bias_ih_l0":
-                th.nn.init.zeros_(param)
+                nn.init.zeros_(param)
             elif name == "gru.bias_hh_l0":
-                th.nn.init.zeros_(param)
+                nn.init.zeros_(param)
             elif name == "fc.weight":
-                th.nn.init.xavier_uniform_(param)
+                nn.init.xavier_uniform_(param)
             elif name == "fc.bias":
-                th.nn.init.constant_(param, -5.)
+                nn.init.constant_(param, -5.)
             else:
                 raise ValueError
         self.to(device)
@@ -48,7 +50,7 @@ class Policy(th.nn.Module):
             hidden = weight.new(self.n_layers, batch_size, self.hidden_dim).zero_().to(self.device)
         return hidden
 
-class ModularPolicyGRU(th.nn.Module):
+class ModularPolicyGRU(nn.Module):
     def __init__(self, input_size: int, module_size: list, output_size: int,
                  vision_mask: list, proprio_mask: list, task_mask: list,
                  connectivity_mask: np.ndarray, output_mask: list,
