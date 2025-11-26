@@ -13,3 +13,6 @@ rm -rf ~/.cache/torch/compile 2>/dev/null || true
 
 # (Optional) Python package cache
 # pip cache purge
+
+rm -fr __pycache__ motornet/__pycache__
+
