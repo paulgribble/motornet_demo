@@ -8,7 +8,7 @@ import motornet as mn
 from my_env    import ExperimentEnv  # the environment
 from my_task   import ExperimentTask # a task
 from my_policy import Policy         # the RNN
-from mehrdad_policies import ModularPolicyGRU         # the modular RNN
+from my_policy import ModularPolicyGRU # the modular RNN
 
 # Apply a curl force field
 def applied_load(endpoint_vel, k, mode = 'CW'):
