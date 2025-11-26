@@ -4,10 +4,8 @@ os.environ['MKL_NUM_THREADS'] = '1' # Set this too just in case
 os.environ["VECLIB_MAXIMUM_THREADS"] = '1'
 
 import torch as th
-th._dynamo.reset()                          # clear compilation cache
 th.set_num_threads(1)                       # intra-op
 th.set_num_interop_threads(1)               # inter-op
-th._dynamo.config.cache_size_limit = 64     # Smaller cache for CPU workloads
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -110,17 +108,6 @@ loss_history = {
 # Optimize loss keys for faster iteration
 loss_keys = ["total", "position", "speed", "jerk", 
              "muscle", "muscle_derivative", "hidden", "hidden_derivative"]
-
-# warm start to get compiling sorted out
-print(f"warm start for compiling ...")
-for i in range(5):
-    task.run_mode = 'train'                                      # random reaches in workspace
-    episode_data = run_episode(env, task, policy, batch_size, n_t, device, k=FF_k) # run the batch forwards
-    loss = calculate_loss_mehrdad(episode_data)                  # calculate loss
-    loss['total'].backward()                                     # propagate loss backwards to compute gradients
-    th.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=1) # so that gradients don't get out of hand
-    optimizer.step()                                             # adjust network weights
-    optimizer.zero_grad(set_to_none=True)                        # zero out the gradients
 
 # main training loop
 print(f"main training loop")

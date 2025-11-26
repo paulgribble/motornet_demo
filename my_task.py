@@ -74,8 +74,9 @@ class ExperimentTask:
             for i in range(n):
                 found = False
                 while not found:
-                    tg_state = self.effector.draw_random_uniform_states(1).detach().cpu().numpy()[0] # joint angles, vels
-                    tg_hand = self.effector.joint2cartesian(tg_state).detach().cpu().numpy()[0]  # hand xy
+                    tg_state_tensor = self.effector.draw_random_uniform_states(1)
+                    tg_state = tg_state_tensor.detach().cpu().numpy()[0] # joint angles, vels
+                    tg_hand = self.effector.joint2cartesian(tg_state_tensor).detach().cpu().numpy()[0]  # hand xy
                     hdist = np.sqrt(np.sum(np.square(tg_hand[0:2] - start_points[i,0:2]))) # dist from start
                     found = (hdist>=dmin) and (hdist<=dmax) # within desired distance range
                     found = found and all(tg_state[0:2] > joints_min) and all(tg_state[0:2] < joints_max) # within joint range
