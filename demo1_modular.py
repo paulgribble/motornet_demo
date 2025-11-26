@@ -14,7 +14,7 @@ from tqdm import tqdm
 import pickle
 
 from my_policy import ModularPolicyGRU       # the modular RNN
-from my_loss   import calculate_loss_michaels as calculate_loss # the loss function
+from my_loss   import calculate_loss_mehrdad as calculate_loss # the loss function
 from my_env    import ExperimentEnv  # the environment
 from my_task   import ExperimentTask # the task
 from my_utils  import run_episode    # run a batch of simulations
@@ -95,19 +95,22 @@ if not os.path.exists(save_name):
 
 # Pre-allocate numpy arrays instead of lists for better memory efficiency
 loss_history = {
-    "total"             : np.zeros(n_batch, dtype=np.float32),
-    "position"          : np.zeros(n_batch, dtype=np.float32),
-    "speed"             : np.zeros(n_batch, dtype=np.float32),
-    "jerk"              : np.zeros(n_batch, dtype=np.float32),
-    "muscle"            : np.zeros(n_batch, dtype=np.float32),
-    "muscle_derivative" : np.zeros(n_batch, dtype=np.float32),
-    "hidden"            : np.zeros(n_batch, dtype=np.float32),
-    "hidden_derivative" : np.zeros(n_batch, dtype=np.float32),
+    "total"        : np.zeros(n_batch, dtype=np.float32),
+    "pos"          : np.zeros(n_batch, dtype=np.float32),
+    "act"          : np.zeros(n_batch, dtype=np.float32),
+    "force"        : np.zeros(n_batch, dtype=np.float32),
+    "force_diff"   : np.zeros(n_batch, dtype=np.float32),
+    "hdn"          : np.zeros(n_batch, dtype=np.float32),
+    "hdn_diff"     : np.zeros(n_batch, dtype=np.float32),
+    "weight_decay" : np.zeros(n_batch, dtype=np.float32),
+    "speed"        : np.zeros(n_batch, dtype=np.float32),
+    "hdn_jerk"     : np.zeros(n_batch, dtype=np.float32),
 }
 
 # Optimize loss keys for faster iteration
-loss_keys = ["total", "position", "speed", "jerk", 
-             "muscle", "muscle_derivative", "hidden", "hidden_derivative"]
+loss_keys = ["total", "pos", "act", "force", 
+             "force_diff", "hdn", "hdn_diff", "weight_decay",
+             "speed", "hdn_jerk"]
 
 # main training loop
 print(f"main training loop")
@@ -122,7 +125,7 @@ for i in tqdm(
     
     task.run_mode = 'train'                                      # random reaches in workspace
     episode_data = run_episode(env, task, policy, batch_size, n_t, device, k=FF_k) # run the batch forwards
-    loss = calculate_loss(episode_data)                  # calculate loss
+    loss = calculate_loss(episode_data, policy, env)                  # calculate loss
     loss['total'].backward()                                     # propagate loss backwards to compute gradients
     th.nn.utils.clip_grad_norm_(policy.parameters(), max_norm=1) # so that gradients don't get out of hand
     optimizer.step()                                             # adjust network weights

@@ -18,7 +18,7 @@ def calculate_loss_michaels(episode_data):
     return losses
 
 
-def calculate_loss_mehrdad(episode_data):
+def calculate_loss_kashefi(episode_data):
     # from Kashefi et al. (2025) bioRxiv https://doi.org/10.1101/2025.09.04.674069
     losses = {
         'position'         : 1e+0 * th.mean(th.abs(episode_data['xy'][:,:,:2] - episode_data['targets'][:,:,:2])),
@@ -32,5 +32,24 @@ def calculate_loss_mehrdad(episode_data):
     losses['total'] = losses['position'] + losses['speed'] + losses['jerk'] + \
                       losses['muscle']   + losses['muscle_derivative'] + \
                       losses['hidden']   + losses['hidden_derivative']
+    return losses
+
+def calculate_loss_mehrdad(episode_data, policy, env):
+    # from Mehrdad Kashefi demo code 'modular_paul_minimal' (November 24, 2025)
+    losses = {
+        'pos'              : 1e+0 * th.mean(th.abs(episode_data['xy'][:,:,:2] - episode_data['targets'][:,:,:2])),
+        'act'              : 0e+0 * th.mean(episode_data['muscle']),
+        'force'            : 1e-4 * th.mean(episode_data['force']),
+        'force_diff'       : 1e-4 * th.mean(th.square(th.diff(episode_data['force'],n=1,dim=1))),
+        'hdn'              : 1e-2 * th.mean(th.square(episode_data['hidden'])),
+        'hdn_diff'         : 1e-1 * th.mean(th.square(th.diff(episode_data['hidden'],n=2,dim=1))), # spectral
+        'weight_decay'     : 1e-7 * th.norm(list(policy.parameters())[1],p=2),
+        'speed'            : 0e+0 * th.mean(th.square(episode_data['xy'][:,:,2:])),
+        'hdn_jerk'         : 1e-10 * th.mean(th.sum(th.square(th.diff(episode_data['hidden'], 3, dim=1) / th.pow(th.tensor(env.effector.dt), 3)), dim=-1)),
+    }
+    losses['total'] = losses['pos'] + losses['act'] + losses['force'] + \
+                      losses['force_diff']   + losses['hdn'] + \
+                      losses['hdn_diff']   + losses['weight_decay'] + \
+                      + losses['speed'] + losses['hdn_jerk']
     return losses
 
