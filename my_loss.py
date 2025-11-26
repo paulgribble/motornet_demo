@@ -37,7 +37,7 @@ def calculate_loss_kashefi(episode_data):
 def calculate_loss_mehrdad(episode_data, policy, env):
     # from Mehrdad Kashefi demo code 'modular_paul_minimal' (November 24, 2025)
     losses = {
-        'pos'              : 1e+0 * th.mean(th.abs(episode_data['xy'][:,:,:2] - episode_data['targets'][:,:,:2])),
+        'pos'              : 1e+0 * th.mean(th.sum(th.abs(episode_data['xy'][:,:,:2] - episode_data['targets'][:,:,:2]), dim=-1)),
         'act'              : 0e+0 * th.mean(th.sum(th.pow(episode_data['muscle'],2), axis=-1)),
         'force'            : 1e-4 * th.mean(th.sum(episode_data['force'], axis=-1)),
         'force_diff'       : 1e-4 * th.mean(th.sum(th.pow(th.diff(episode_data['force'], axis=1),2),axis=-1)),
