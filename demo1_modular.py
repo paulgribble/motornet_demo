@@ -59,7 +59,7 @@ proprio_dim = np.arange(env.get_proprioception().shape[1]) + vision_dim[-1] + 1
 
 # define the modular RNN
 policy = ModularPolicyGRU(input_size  = env.observation_space.shape[0] + n_task_inputs,
-                          module_size = [256, 256, 32],
+                          module_size = [256, 256, 64],
                           output_size = env.n_muscles,
                           vision_dim  = vision_dim,
                           proprio_dim = proprio_dim,
