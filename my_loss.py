@@ -37,14 +37,14 @@ def calculate_loss_kashefi(episode_data):
 def calculate_loss_mehrdad(episode_data, policy, env):
     # from Mehrdad Kashefi demo code 'modular_paul_minimal' (November 24, 2025)
     losses = {
-        'pos'              : 1e+0 * th.mean(th.sum(th.abs(episode_data['xy'][:,:,:2] - episode_data['targets'][:,:,:2]), dim=-1)),
-        'act'              : 0e+0 * th.mean(th.sum(th.pow(episode_data['muscle'],2), axis=-1)),
-        'force'            : 1e-4 * th.mean(th.sum(episode_data['force'], axis=-1)),
-        'force_diff'       : 1e-4 * th.mean(th.sum(th.pow(th.diff(episode_data['force'], axis=1),2),axis=-1)),
-        'hdn'              : 1e-2 * th.mean(th.sum(th.pow(episode_data['hidden'],2),-1)),
-        'hdn_diff'         : 1e-1 * th.mean(th.sum(th.pow(th.diff(episode_data['hidden'], axis=1),2),axis=-1)),
-        'weight_decay'     : 1e-7 * th.norm(list(policy.parameters())[1],p=2),
-        'speed'            : 0e+0 * th.mean(th.sum(th.pow(episode_data['xy'][:,:,2:],2), axis=-1)),
+        'pos'              : 1e+00 * th.mean(th.sum(th.abs(episode_data['xy'][:,:,:2] - episode_data['targets'][:,:,:2]), dim=-1)),
+        'act'              : 0e+00 * th.mean(th.sum(th.pow(episode_data['muscle'],2), axis=-1)),
+        'force'            : 1e-04 * th.mean(th.sum(episode_data['force'], axis=-1)),
+        'force_diff'       : 1e-04 * th.mean(th.sum(th.pow(th.diff(episode_data['force'], axis=1),2),axis=-1)),
+        'hdn'              : 1e-02 * th.mean(th.sum(th.pow(episode_data['hidden'],2),-1)),
+        'hdn_diff'         : 1e-01 * th.mean(th.sum(th.pow(th.diff(episode_data['hidden'], axis=1),2),axis=-1)),
+        'weight_decay'     : 1e-07 * th.norm(list(policy.parameters())[1],p=2),
+        'speed'            : 0e+00 * th.mean(th.sum(th.pow(episode_data['xy'][:,:,2:],2), axis=-1)),
         'hdn_jerk'         : 1e-10 * th.mean(th.sum(th.square(th.diff(episode_data['hidden'], 3, dim=1) / th.pow(th.tensor(env.effector.dt), 3)), dim=-1)),
     }
     losses['total'] = losses['pos'] + losses['act'] + losses['force'] + \
