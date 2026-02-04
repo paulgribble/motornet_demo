@@ -1,5 +1,5 @@
-import numpy as np
 import torch as th
+
 
 def calculate_loss_michaels(episode_data):
     # from Michaels et al. (2025) Nature https://doi.org/10.1038/s41586-025-09690-9
@@ -36,20 +36,29 @@ def calculate_loss_kashefi(episode_data):
 
 def calculate_loss_mehrdad(episode_data, policy, env):
     # from Mehrdad Kashefi demo code 'modular_paul_minimal' (November 24, 2025)
+    # Get recurrent weight for weight decay (GRU weight_hh_l0)
+    recurrent_weight = None
+    for name, param in policy.named_parameters():
+        if 'weight_hh' in name or 'recurrent' in name.lower():
+            recurrent_weight = param
+            break
+    if recurrent_weight is None:
+        recurrent_weight = th.tensor(0.0)  # Fallback if not found
+
     losses = {
         'pos'              : 1e+00 * th.mean(th.sum(th.abs(episode_data['xy'][:,:,:2] - episode_data['targets'][:,:,:2]), dim=-1)),
-        'act'              : 0e+00 * th.mean(th.sum(th.pow(episode_data['muscle'],2), axis=-1)),
-        'force'            : 1e-04 * th.mean(th.sum(episode_data['force'], axis=-1)),
-        'force_diff'       : 1e-04 * th.mean(th.sum(th.pow(th.diff(episode_data['force'], axis=1),2),axis=-1)),
-        'hdn'              : 1e-02 * th.mean(th.sum(th.pow(episode_data['hidden'],2),-1)),
-        'hdn_diff'         : 1e-01 * th.mean(th.sum(th.pow(th.diff(episode_data['hidden'], axis=1),2),axis=-1)),
-        'weight_decay'     : 1e-07 * th.norm(list(policy.parameters())[1],p=2),
-        'speed'            : 0e+00 * th.mean(th.sum(th.pow(episode_data['xy'][:,:,2:],2), axis=-1)),
+        'act'              : 0e+00 * th.mean(th.sum(th.pow(episode_data['muscle'], 2), dim=-1)),
+        'force'            : 1e-04 * th.mean(th.sum(episode_data['force'], dim=-1)),
+        'force_diff'       : 1e-04 * th.mean(th.sum(th.pow(th.diff(episode_data['force'], dim=1), 2), dim=-1)),
+        'hdn'              : 1e-02 * th.mean(th.sum(th.pow(episode_data['hidden'], 2), dim=-1)),
+        'hdn_diff'         : 1e-01 * th.mean(th.sum(th.pow(th.diff(episode_data['hidden'], dim=1), 2), dim=-1)),
+        'weight_decay'     : 1e-07 * th.norm(recurrent_weight, p=2),
+        'speed'            : 0e+00 * th.mean(th.sum(th.pow(episode_data['xy'][:,:,2:], 2), dim=-1)),
         'hdn_jerk'         : 1e-10 * th.mean(th.sum(th.square(th.diff(episode_data['hidden'], 3, dim=1) / th.pow(th.tensor(env.effector.dt), 3)), dim=-1)),
     }
     losses['total'] = losses['pos'] + losses['act'] + losses['force'] + \
-                      losses['force_diff']   + losses['hdn'] + \
-                      losses['hdn_diff']   + losses['weight_decay'] + \
-                      + losses['speed'] + losses['hdn_jerk']
+                      losses['force_diff'] + losses['hdn'] + \
+                      losses['hdn_diff'] + losses['weight_decay'] + \
+                      losses['speed'] + losses['hdn_jerk']
     return losses
 
