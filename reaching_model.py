@@ -80,9 +80,9 @@ class ModelConfig:
     # Modular-specific parameters (used only when modular=True)
     vision_mask: list = field(default_factory=lambda: [0.2, 0.0, 0.0, 0.0])
     proprio_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.5, 0.3])
-    task_mask: list = field(default_factory=lambda: [0.2, 0.02, 0.0, 0.0])
+    task_mask: list = field(default_factory=lambda: [0.7, 0.02, 0.0, 0.0])
     connectivity_mask: list = field(default_factory=lambda: [
-        [1.0, 0.1, 0.05, 0.0],
+        [1.0, 0.1, 0.0, 0.0],
         [0.2, 1.0, 0.2, 0.0],
         [0.05, 0.1, 1.0, 0.1],
         [0.0, 0.2, 0.05, 1.0]
@@ -737,8 +737,8 @@ Examples:
                            help="Vision input probability per module (default: 0.2 0.0 0.0 0.0)")
     mod_group.add_argument("--proprio-mask", type=float, nargs="+", default=[0.0, 0.0, 0.5, 0.3],
                            help="Proprioception input probability per module (default: 0.0 0.0 0.5 0.3)")
-    mod_group.add_argument("--task-mask", type=float, nargs="+", default=[0.2, 0.02, 0.0, 0.0],
-                           help="Task input probability per module (default: 0.2 0.02 0.0 0.0)")
+    mod_group.add_argument("--task-mask", type=float, nargs="+", default=[0.7, 0.02, 0.0, 0.0],
+                           help="Task input probability per module (default: 0.7 0.02 0.0 0.0)")
     mod_group.add_argument("--output-mask", type=float, nargs="+", default=[0.0, 0.0, 0.0, 0.5],
                            help="Output probability per module (default: 0.0 0.0 0.0 0.5)")
     mod_group.add_argument("--spectral-scaling", type=float, default=1.1,

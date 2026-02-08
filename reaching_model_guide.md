@@ -26,12 +26,12 @@ Proprioception┘
 
 **Modular GRU** (`modular=True`): Multiple GRU modules with structured, sparse connectivity. Each module receives a probabilistic subset of inputs (vision, proprioception, task signals) and has sparse inter-module connections. The default 4-module architecture maps to brain regions involved in primate reaching:
 
-| Module | Name | Size | Role |
-|--------|------|------|------|
-| 0 | Premotor cortex (PMC) | 256 | Planning, visual-spatial processing, task/goal encoding |
-| 1 | Motor cortex (M1) | 256 | Motor command generation |
-| 2 | Somatosensory cortex (S1) | 128 | Proprioceptive processing, sensory feedback |
-| 3 | Spinal cord (SC) | 64 | Motor output, local reflex circuits |
+| Module |           Name            | Size |                          Role                           |
+| ------ | ------------------------- | ---- | ------------------------------------------------------- |
+| 0      | Premotor cortex (PMC)     | 256  | Planning, visual-spatial processing, task/goal encoding |
+| 1      | Motor cortex (M1)         | 256  | Motor command generation                                |
+| 2      | Somatosensory cortex (S1) | 128  | Proprioceptive processing, sensory feedback             |
+| 3      | Spinal cord (SC)          | 64   | Motor output, local reflex circuits                     |
 
 The connectivity between modules reflects known primate neuroanatomy:
 - **PMC → M1**: Main planning-to-execution pathway
@@ -39,7 +39,7 @@ The connectivity between modules reflects known primate neuroanatomy:
 - **S1 → M1**: Areas 3a/2 project densely to M1 for online correction
 - **M1 → S1**: Efference copy / corollary discharge
 - **SC → S1**: Ascending sensory pathways (dorsal columns, via thalamus)
-- Vision reaches PMC via the dorsal stream; proprioception reaches S1 (via thalamus) and SC (direct afferents); only SC drives muscle output (motor neurons in the ventral horn).
+- There is no direct PMC → S1 connection. Vision reaches PMC via the dorsal stream; proprioception reaches S1 (via thalamus) and SC (direct afferents); only SC drives muscle output (motor neurons in the ventral horn).
 
 ## Python API
 
@@ -57,30 +57,30 @@ model = ReachingModel.create("modular_model", modular=True, module_sizes=[256, 2
 
 All configurable parameters at creation time:
 
-| Parameter | Default | Description |
-|---|---|---|
-| `n_units` | 256 | Hidden units (simple model only) |
-| `modular` | False | Use modular architecture |
-| `module_sizes` | [256, 256, 128, 64] | Units per module (modular only) |
-| `episode_duration` | 3.0 | Simulation duration in seconds |
-| `proprioception_delay` | 0.02 | Proprioceptive feedback delay (seconds) |
-| `vision_delay` | 0.07 | Visual feedback delay (seconds) |
-| `proprioception_noise` | 1e-3 | Proprioceptive noise (std dev) |
-| `vision_noise` | 1e-3 | Visual noise (std dev) |
-| `action_noise` | 1e-4 | Motor command noise (std dev) |
-| `learning_rate` | 1e-3 | Adam optimizer learning rate |
+|       Parameter        |       Default       |               Description               |
+| ---------------------- | ------------------- | --------------------------------------- |
+| `n_units`              | 256                 | Hidden units (simple model only)        |
+| `modular`              | False               | Use modular architecture                |
+| `module_sizes`         | [256, 256, 128, 64] | Units per module (modular only)         |
+| `episode_duration`     | 3.0                 | Simulation duration in seconds          |
+| `proprioception_delay` | 0.02                | Proprioceptive feedback delay (seconds) |
+| `vision_delay`         | 0.07                | Visual feedback delay (seconds)         |
+| `proprioception_noise` | 1e-3                | Proprioceptive noise (std dev)          |
+| `vision_noise`         | 1e-3                | Visual noise (std dev)                  |
+| `action_noise`         | 1e-4                | Motor command noise (std dev)           |
+| `learning_rate`        | 1e-3                | Adam optimizer learning rate            |
 
 Modular-only parameters:
 
-| Parameter | Default | Description |
-|---|---|---|
-| `vision_mask` | [0.2, 0.0, 0.0, 0.0] | Connection probability from vision to each module (PMC, M1, S1, SC) |
-| `proprio_mask` | [0.0, 0.0, 0.5, 0.3] | Connection probability from proprioception to each module |
-| `task_mask` | [0.2, 0.02, 0.0, 0.0] | Connection probability from task inputs to each module |
-| `connectivity_mask` | 4x4 matrix | Inter-module connection probabilities |
-| `output_mask` | [0.0, 0.0, 0.0, 0.5] | Connection probability from each module to output |
-| `module_names` | ["premotor", "motor", "somatosensory", "spinal"] | Names for each module |
-| `spectral_scaling` | 1.1 | Spectral radius scaling for recurrent weights |
+|      Parameter      |                     Default                      |                             Description                             |
+| ------------------- | ------------------------------------------------ | ------------------------------------------------------------------- |
+| `vision_mask`       | [0.2, 0.0, 0.0, 0.0]                             | Connection probability from vision to each module (PMC, M1, S1, SC) |
+| `proprio_mask`      | [0.0, 0.0, 0.5, 0.3]                             | Connection probability from proprioception to each module           |
+| `task_mask`         | [0.7, 0.02, 0.0, 0.0]                            | Connection probability from task inputs to each module              |
+| `connectivity_mask` | 4x4 matrix                                       | Inter-module connection probabilities                               |
+| `output_mask`       | [0.0, 0.0, 0.0, 0.5]                             | Connection probability from each module to output                   |
+| `module_names`      | ["premotor", "motor", "somatosensory", "spinal"] | Names for each module                                               |
+| `spectral_scaling`  | 1.1                                              | Spectral radius scaling for recurrent weights                       |
 
 ### Training
 
@@ -94,14 +94,14 @@ model.train(n_batches=5000, ff_strength=15.0)
 model.train(n_batches=10000, task_mode="center_out")
 ```
 
-| Parameter | Default | Description |
-|---|---|---|
-| `n_batches` | 10000 | Number of training batches |
-| `batch_size` | 64 | Trials per batch |
-| `ff_strength` | 0.0 | Curl force field strength (0 = none) |
-| `task_mode` | "random" | "random" or "center_out" |
-| `plot_interval` | 100 | Batches between plot saves (0 = off) |
-| `quiet` | False | Suppress progress bar |
+|    Parameter    | Default  |             Description              |
+| --------------- | -------- | ------------------------------------ |
+| `n_batches`     | 10000    | Number of training batches           |
+| `batch_size`    | 64       | Trials per batch                     |
+| `ff_strength`   | 0.0      | Curl force field strength (0 = none) |
+| `task_mode`     | "random" | "random" or "center_out"             |
+| `plot_interval` | 100      | Batches between plot saves (0 = off) |
+| `quiet`         | False    | Suppress progress bar                |
 
 Training automatically saves intermediate plots (loss curves, hand paths, neural/muscle signals) and saves the model when finished. Training can be resumed — calling `train()` again continues from where it left off.
 
@@ -114,13 +114,13 @@ results = model.test(n_targets=8)
 results = model.test(n_targets=8, ff_strength=15.0)
 ```
 
-| Parameter | Default | Description |
-|---|---|---|
-| `n_targets` | 8 | Number of targets in a circle |
-| `ff_strength` | 0.0 | Curl force field strength |
-| `simulation_time` | episode_duration | Override simulation duration |
-| `save_plots` | True | Save hand path and signal plots |
-| `save_data` | True | Save episode data as pickle |
+|     Parameter     |     Default      |           Description           |
+| ----------------- | ---------------- | ------------------------------- |
+| `n_targets`       | 8                | Number of targets in a circle   |
+| `ff_strength`     | 0.0              | Curl force field strength       |
+| `simulation_time` | episode_duration | Override simulation duration    |
+| `save_plots`      | True             | Save hand path and signal plots |
+| `save_data`       | True             | Save episode data as pickle     |
 
 Testing runs center-out reaches with fixed timing (target at 0.5s, go cue at 1.0s, no catch trials) for reproducible evaluation.
 
@@ -195,31 +195,31 @@ The model type determines which loss function is used:
 
 Based on Michaels et al. (2025). Penalizes:
 
-| Component | Weight | What it penalizes |
-|---|---|---|
-| position | 1e+3 | Distance from target |
-| speed | 2e+2 | Hand velocity (encourages stopping) |
-| jerk | 1e+6 | Hand jerk (encourages smoothness) |
-| muscle | 1e+0 | Muscle force (encourages efficiency) |
-| muscle_derivative | 0 | Force changes (disabled) |
-| hidden | 1e-1 | Hidden unit activity (regularization) |
-| hidden_derivative | 1e+4 | Hidden activity jerk (stabilizes dynamics) |
+|     Component     | Weight |             What it penalizes              |
+| ----------------- | ------ | ------------------------------------------ |
+| position          | 1e+3   | Distance from target                       |
+| speed             | 2e+2   | Hand velocity (encourages stopping)        |
+| jerk              | 1e+6   | Hand jerk (encourages smoothness)          |
+| muscle            | 1e+0   | Muscle force (encourages efficiency)       |
+| muscle_derivative | 0      | Force changes (disabled)                   |
+| hidden            | 1e-1   | Hidden unit activity (regularization)      |
+| hidden_derivative | 1e+4   | Hidden activity jerk (stabilizes dynamics) |
 
 ### Modular model: `calculate_loss_mehrdad`
 
 Based on Kashefi demo code. Adds weight decay and uses different scaling:
 
-| Component | Weight | What it penalizes |
-|---|---|---|
-| pos | 1e+0 | Position error |
-| act | 0 | Muscle activation (disabled) |
-| force | 1e-4 | Muscle forces |
-| force_diff | 1e-4 | Force changes |
-| hdn | 1e-2 | Hidden activity |
-| hdn_diff | 1e-1 | Hidden activity changes |
-| weight_decay | 1e-7 | L2 norm of recurrent weights |
-| speed | 0 | Speed (disabled) |
-| hdn_jerk | 1e-10 | Hidden activity jerk |
+|  Component   | Weight |      What it penalizes       |
+| ------------ | ------ | ---------------------------- |
+| pos          | 1e+0   | Position error               |
+| act          | 0      | Muscle activation (disabled) |
+| force        | 1e-4   | Muscle forces                |
+| force_diff   | 1e-4   | Force changes                |
+| hdn          | 1e-2   | Hidden activity              |
+| hdn_diff     | 1e-1   | Hidden activity changes      |
+| weight_decay | 1e-7   | L2 norm of recurrent weights |
+| speed        | 0      | Speed (disabled)             |
+| hdn_jerk     | 1e-10  | Hidden activity jerk         |
 
 ## Force Fields
 
