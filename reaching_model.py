@@ -44,7 +44,8 @@ th.set_num_interop_threads(1)
 
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend for saving plots
+if 'IPython' not in sys.modules:
+    matplotlib.use('Agg')  # Non-interactive backend for saving plots
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
