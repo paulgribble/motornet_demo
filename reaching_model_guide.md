@@ -24,7 +24,22 @@ Proprioception┘
 
 **Simple GRU** (`modular=False`, default): A standard single-module GRU. All inputs feed into one recurrent layer of `n_units` hidden units.
 
-**Modular GRU** (`modular=True`): Multiple GRU modules with structured, sparse connectivity. Each module receives a probabilistic subset of inputs (vision, proprioception, task signals) and has sparse inter-module connections. This architecture is inspired by the modular organization of biological motor circuits.
+**Modular GRU** (`modular=True`): Multiple GRU modules with structured, sparse connectivity. Each module receives a probabilistic subset of inputs (vision, proprioception, task signals) and has sparse inter-module connections. The default 4-module architecture maps to brain regions involved in primate reaching:
+
+| Module | Name | Size | Role |
+|--------|------|------|------|
+| 0 | Premotor cortex (PMC) | 256 | Planning, visual-spatial processing, task/goal encoding |
+| 1 | Motor cortex (M1) | 256 | Motor command generation |
+| 2 | Somatosensory cortex (S1) | 128 | Proprioceptive processing, sensory feedback |
+| 3 | Spinal cord (SC) | 64 | Motor output, local reflex circuits |
+
+The connectivity between modules reflects known primate neuroanatomy:
+- **PMC → M1**: Main planning-to-execution pathway
+- **M1 → SC**: Corticospinal tract (primary descending motor pathway)
+- **S1 → M1**: Areas 3a/2 project densely to M1 for online correction
+- **M1 → S1**: Efference copy / corollary discharge
+- **SC → S1**: Ascending sensory pathways (dorsal columns, via thalamus)
+- Vision reaches PMC via the dorsal stream; proprioception reaches S1 (via thalamus) and SC (direct afferents); only SC drives muscle output (motor neurons in the ventral horn).
 
 ## Python API
 
@@ -36,8 +51,8 @@ from reaching_model import ReachingModel
 # Simple model (256-unit GRU)
 model = ReachingModel.create("my_model", n_units=256)
 
-# Modular model (3 modules: 256, 256, 64 units)
-model = ReachingModel.create("modular_model", modular=True, module_sizes=[256, 256, 64])
+# Modular model (4 modules: premotor, motor, somatosensory, spinal)
+model = ReachingModel.create("modular_model", modular=True, module_sizes=[256, 256, 128, 64])
 ```
 
 All configurable parameters at creation time:
@@ -46,7 +61,7 @@ All configurable parameters at creation time:
 |---|---|---|
 | `n_units` | 256 | Hidden units (simple model only) |
 | `modular` | False | Use modular architecture |
-| `module_sizes` | [256, 256, 64] | Units per module (modular only) |
+| `module_sizes` | [256, 256, 128, 64] | Units per module (modular only) |
 | `episode_duration` | 3.0 | Simulation duration in seconds |
 | `proprioception_delay` | 0.02 | Proprioceptive feedback delay (seconds) |
 | `vision_delay` | 0.07 | Visual feedback delay (seconds) |
@@ -59,11 +74,12 @@ Modular-only parameters:
 
 | Parameter | Default | Description |
 |---|---|---|
-| `vision_mask` | [0.2, 0.0, 0.0] | Connection probability from vision to each module |
-| `proprio_mask` | [0.0, 0.0, 0.5] | Connection probability from proprioception to each module |
-| `task_mask` | [0.2, 0.02, 0.0] | Connection probability from task inputs to each module |
-| `connectivity_mask` | 3x3 matrix | Inter-module connection probabilities |
-| `output_mask` | [0.0, 0.0, 0.5] | Connection probability from each module to output |
+| `vision_mask` | [0.2, 0.0, 0.0, 0.0] | Connection probability from vision to each module (PMC, M1, S1, SC) |
+| `proprio_mask` | [0.0, 0.0, 0.5, 0.3] | Connection probability from proprioception to each module |
+| `task_mask` | [0.2, 0.02, 0.0, 0.0] | Connection probability from task inputs to each module |
+| `connectivity_mask` | 4x4 matrix | Inter-module connection probabilities |
+| `output_mask` | [0.0, 0.0, 0.0, 0.5] | Connection probability from each module to output |
+| `module_names` | ["premotor", "motor", "somatosensory", "spinal"] | Names for each module |
 | `spectral_scaling` | 1.1 | Spectral radius scaling for recurrent weights |
 
 ### Training
@@ -130,7 +146,7 @@ All operations are available from the command line:
 ```bash
 # Create a model
 uv run reaching_model.py create my_model --units 256
-uv run reaching_model.py create modular_model --modular --module-sizes 256 256 64
+uv run reaching_model.py create modular_model --modular --module-sizes 256 256 128 64
 
 # Train
 uv run reaching_model.py train my_model --batches 10000 --batch-size 64
@@ -275,7 +291,7 @@ model.test(n_targets=8, ff_strength=0.0)   # After-effects
 simple = ReachingModel.create("simple_256", n_units=256)
 simple.train(n_batches=10000)
 
-modular = ReachingModel.create("modular_3mod", modular=True, module_sizes=[256, 256, 64])
+modular = ReachingModel.create("modular_4mod", modular=True, module_sizes=[256, 256, 128, 64])
 modular.train(n_batches=10000)
 ```
 

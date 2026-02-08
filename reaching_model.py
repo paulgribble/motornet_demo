@@ -66,7 +66,8 @@ class ModelConfig:
     name: str
     n_units: int = 256
     modular: bool = False
-    module_sizes: list = field(default_factory=lambda: [256, 256, 64])
+    module_sizes: list = field(default_factory=lambda: [256, 256, 128, 64])
+    module_names: list = field(default_factory=lambda: ["premotor", "motor", "somatosensory", "spinal"])
     episode_duration: float = 3.0
     proprioception_delay: float = 0.02
     vision_delay: float = 0.07
@@ -76,11 +77,16 @@ class ModelConfig:
     learning_rate: float = 1e-3
 
     # Modular-specific parameters (used only when modular=True)
-    vision_mask: list = field(default_factory=lambda: [0.2, 0.0, 0.0])
-    proprio_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.5])
-    task_mask: list = field(default_factory=lambda: [0.2, 0.02, 0.0])
-    connectivity_mask: list = field(default_factory=lambda: [[1., 0.2, 0.02], [0.2, 1., 0.2], [0., 0.2, 1.]])
-    output_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.5])
+    vision_mask: list = field(default_factory=lambda: [0.2, 0.0, 0.0, 0.0])
+    proprio_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.5, 0.3])
+    task_mask: list = field(default_factory=lambda: [0.2, 0.02, 0.0, 0.0])
+    connectivity_mask: list = field(default_factory=lambda: [
+        [1.0, 0.1, 0.05, 0.0],
+        [0.2, 1.0, 0.2, 0.0],
+        [0.05, 0.1, 1.0, 0.1],
+        [0.0, 0.2, 0.05, 1.0]
+    ])
+    output_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.5])
     spectral_scaling: float = 1.1
 
     def to_dict(self) -> dict:
@@ -172,7 +178,7 @@ class ReachingModel:
             name: Name for the model (will create a directory with this name)
             n_units: Number of hidden units (for simple models)
             modular: If True, create a modular architecture with multiple RNN modules
-            module_sizes: List of sizes for each module (modular only). Default: [256, 256, 64]
+            module_sizes: List of sizes for each module (modular only). Default: [256, 256, 128, 64]
             episode_duration: Duration of each simulation episode in seconds
             save: If True, save the model after creation
             **kwargs: Additional configuration parameters
@@ -184,14 +190,14 @@ class ReachingModel:
             # Simple model with 256 units
             model = ReachingModel.create("my_model", n_units=256)
 
-            # Modular model with 3 modules
+            # Modular model with 4 modules (premotor, motor, somatosensory, spinal)
             model = ReachingModel.create("modular_model", modular=True)
         """
         device = th.device("cpu")
 
         # Build configuration
         if module_sizes is None:
-            module_sizes = [256, 256, 64]
+            module_sizes = [256, 256, 128, 64]
 
         config = ModelConfig(
             name=name,
@@ -622,7 +628,11 @@ class ReachingModel:
         """Return a summary of the model."""
         arch_type = "Modular" if self.config.modular else "Simple"
         if self.config.modular:
-            units_str = f"modules: {self.config.module_sizes}"
+            names = getattr(self.config, 'module_names', None)
+            if not names or len(names) != len(self.config.module_sizes):
+                names = [f"module_{i}" for i in range(len(self.config.module_sizes))]
+            modules_detail = ", ".join(f"{n}({s})" for n, s in zip(names, self.config.module_sizes))
+            units_str = f"modules: [{modules_detail}]"
         else:
             units_str = f"{self.config.n_units} units"
 
@@ -691,8 +701,8 @@ Examples:
                             help="Number of hidden units for simple model (default: 256)")
     arch_group.add_argument("--modular", action="store_true",
                             help="Create a modular architecture with multiple RNN modules")
-    arch_group.add_argument("--module-sizes", type=int, nargs="+", default=[256, 256, 64],
-                            help="Sizes of each module for modular architecture (default: 256 256 64)")
+    arch_group.add_argument("--module-sizes", type=int, nargs="+", default=[256, 256, 128, 64],
+                            help="Sizes of each module for modular architecture (default: 256 256 128 64)")
 
     # Episode options
     ep_group = create_parser.add_argument_group("Episode settings")
@@ -722,14 +732,14 @@ Examples:
 
     # Modular-specific options
     mod_group = create_parser.add_argument_group("Modular architecture options (only used with --modular)")
-    mod_group.add_argument("--vision-mask", type=float, nargs="+", default=[0.2, 0.0, 0.0],
-                           help="Vision input probability per module (default: 0.2 0.0 0.0)")
-    mod_group.add_argument("--proprio-mask", type=float, nargs="+", default=[0.0, 0.0, 0.5],
-                           help="Proprioception input probability per module (default: 0.0 0.0 0.5)")
-    mod_group.add_argument("--task-mask", type=float, nargs="+", default=[0.2, 0.02, 0.0],
-                           help="Task input probability per module (default: 0.2 0.02 0.0)")
-    mod_group.add_argument("--output-mask", type=float, nargs="+", default=[0.0, 0.0, 0.5],
-                           help="Output probability per module (default: 0.0 0.0 0.5)")
+    mod_group.add_argument("--vision-mask", type=float, nargs="+", default=[0.2, 0.0, 0.0, 0.0],
+                           help="Vision input probability per module (default: 0.2 0.0 0.0 0.0)")
+    mod_group.add_argument("--proprio-mask", type=float, nargs="+", default=[0.0, 0.0, 0.5, 0.3],
+                           help="Proprioception input probability per module (default: 0.0 0.0 0.5 0.3)")
+    mod_group.add_argument("--task-mask", type=float, nargs="+", default=[0.2, 0.02, 0.0, 0.0],
+                           help="Task input probability per module (default: 0.2 0.02 0.0 0.0)")
+    mod_group.add_argument("--output-mask", type=float, nargs="+", default=[0.0, 0.0, 0.0, 0.5],
+                           help="Output probability per module (default: 0.0 0.0 0.0 0.5)")
     mod_group.add_argument("--spectral-scaling", type=float, default=1.1,
                            help="Spectral radius scaling for recurrent weights (default: 1.1)")
 

@@ -431,6 +431,34 @@ def load_model(cfg_file, weight_file):
         vision_dim = np.arange(env.get_vision().shape[1]) + task_dim[-1] + 1
         proprio_dim = np.arange(env.get_proprioception().shape[1]) + vision_dim[-1] + 1
 
+        n_modules = len(cfg['module_size'])
+
+        # Read masks from config if present, otherwise use defaults matching module count
+        if n_modules == 3:
+            default_vision = [0.2, 0.0, 0.0]
+            default_proprio = [0.0, 0.0, 0.5]
+            default_task = [0.2, 0.02, 0.0]
+            default_conn = [[1., 0.2, 0.02], [0.2, 1., 0.2], [0., 0.2, 1.]]
+            default_output = [0.0, 0.0, 0.5]
+        else:
+            default_vision = [0.2, 0.0, 0.0, 0.0]
+            default_proprio = [0.0, 0.0, 0.5, 0.3]
+            default_task = [0.2, 0.02, 0.0, 0.0]
+            default_conn = [
+                [1.0, 0.1, 0.05, 0.0],
+                [0.2, 1.0, 0.2, 0.0],
+                [0.05, 0.1, 1.0, 0.1],
+                [0.0, 0.2, 0.05, 1.0]
+            ]
+            default_output = [0.0, 0.0, 0.0, 0.5]
+
+        vision_mask = cfg.get('vision_mask', default_vision)
+        proprio_mask = cfg.get('proprio_mask', default_proprio)
+        task_mask = cfg.get('task_mask', default_task)
+        connectivity_mask = cfg.get('connectivity_mask', default_conn)
+        output_mask = cfg.get('output_mask', default_output)
+        spectral_scaling = cfg.get('spectral_scaling', 1.1)
+
         policy = ModularPolicyGRU(
             input_size=input_size,
             module_size=cfg['module_size'],
@@ -438,13 +466,13 @@ def load_model(cfg_file, weight_file):
             vision_dim=vision_dim,
             proprio_dim=proprio_dim,
             task_dim=task_dim,
-            vision_mask=[0.2, 0.0, 0.0],
-            proprio_mask=[0.0, 0.0, 0.5],
-            task_mask=[0.2, 0.02, 0.0],
-            connectivity_mask=np.array([[1., 0.2, 0.02], [0.2, 1., 0.2], [0., 0.2, 1.]]),
-            output_mask=[0.0, 0.0, 0.5],
-            connectivity_delay=np.zeros((len(cfg['module_size']), len(cfg['module_size']))),
-            spectral_scaling=1.1,
+            vision_mask=vision_mask,
+            proprio_mask=proprio_mask,
+            task_mask=task_mask,
+            connectivity_mask=np.array(connectivity_mask),
+            output_mask=output_mask,
+            connectivity_delay=np.zeros((n_modules, n_modules)),
+            spectral_scaling=spectral_scaling,
             device=device,
             activation='tanh'
         )
