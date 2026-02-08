@@ -535,9 +535,10 @@ class ReachingModel:
         # Choose appropriate plotting function
         plot_signals_fn = plot_signals_modular if self.config.modular else plot_signals
 
+        ff_suffix = f"_ff{ff_strength:.0f}" if ff_strength > 0 else ""
+
         if save_plots:
             # Plot hand paths
-            ff_suffix = f"_ff{ff_strength:.0f}" if ff_strength > 0 else ""
             plot_handpaths(
                 episode_data=episode_data,
                 fname=os.path.join(self.name, f"{self.name}_test_handpaths{ff_suffix}.png"),
