@@ -67,7 +67,7 @@ class ModelConfig:
     name: str
     n_units: int = 256
     modular: bool = False
-    module_sizes: list = field(default_factory=lambda: [256, 256, 128, 64])
+    module_sizes: list = field(default_factory=lambda: [256, 256, 256, 64])
     module_names: list = field(default_factory=lambda: ["premotor", "motor", "somatosensory", "spinal"])
     episode_duration: float = 3.0
     proprioception_delay: float = 0.02
@@ -78,14 +78,14 @@ class ModelConfig:
     learning_rate: float = 1e-3
 
     # Modular-specific parameters (used only when modular=True)
-    vision_mask: list = field(default_factory=lambda: [0.2, 0.0, 0.0, 0.0])
-    proprio_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.5, 0.3])
-    task_mask: list = field(default_factory=lambda: [0.7, 0.02, 0.0, 0.0])
+    vision_mask: list = field(default_factory=lambda:  [0.3, 0.0, 0.0, 0.0])
+    proprio_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.4, 0.3])
+    task_mask: list = field(default_factory=lambda:    [0.5, 0.0, 0.0, 0.0])
     connectivity_mask: list = field(default_factory=lambda: [
-        [1.0, 0.1, 0.0, 0.0],
-        [0.2, 1.0, 0.2, 0.0],
-        [0.05, 0.1, 1.0, 0.1],
-        [0.0, 0.2, 0.05, 1.0]
+        [0.80, 0.10, 0.00, 0.00],
+        [0.35, 0.80, 0.20, 0.00],
+        [0.00, 0.10, 0.80, 0.10],
+        [0.00, 0.20, 0.05, 0.80]
     ])
     output_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.5])
     spectral_scaling: float = 1.1
@@ -691,9 +691,8 @@ Examples:
   Model with high noise:
     %(prog)s noisy --proprio-noise 0.005 --vision-noise 0.003
 
-  Modular model with custom connectivity:
-    %(prog)s modular --modular --module-sizes 200 100 50 \\
-        --vision-mask 0.3 0.1 0.0 --proprio-mask 0.0 0.1 0.6
+  Modular model (uses ModelConfig defaults):
+    %(prog)s modular --modular
         """)
     create_parser.add_argument("name", help="Name for the model")
 
@@ -703,8 +702,6 @@ Examples:
                             help="Number of hidden units for simple model (default: 256)")
     arch_group.add_argument("--modular", action="store_true",
                             help="Create a modular architecture with multiple RNN modules")
-    arch_group.add_argument("--module-sizes", type=int, nargs="+", default=[256, 256, 128, 64],
-                            help="Sizes of each module for modular architecture (default: 256 256 128 64)")
 
     # Episode options
     ep_group = create_parser.add_argument_group("Episode settings")
@@ -731,19 +728,6 @@ Examples:
     learn_group = create_parser.add_argument_group("Learning")
     learn_group.add_argument("--learning-rate", type=float, default=1e-3,
                              help="Optimizer learning rate (default: 0.001)")
-
-    # Modular-specific options
-    mod_group = create_parser.add_argument_group("Modular architecture options (only used with --modular)")
-    mod_group.add_argument("--vision-mask", type=float, nargs="+", default=[0.2, 0.0, 0.0, 0.0],
-                           help="Vision input probability per module (default: 0.2 0.0 0.0 0.0)")
-    mod_group.add_argument("--proprio-mask", type=float, nargs="+", default=[0.0, 0.0, 0.5, 0.3],
-                           help="Proprioception input probability per module (default: 0.0 0.0 0.5 0.3)")
-    mod_group.add_argument("--task-mask", type=float, nargs="+", default=[0.7, 0.02, 0.0, 0.0],
-                           help="Task input probability per module (default: 0.7 0.02 0.0 0.0)")
-    mod_group.add_argument("--output-mask", type=float, nargs="+", default=[0.0, 0.0, 0.0, 0.5],
-                           help="Output probability per module (default: 0.0 0.0 0.0 0.5)")
-    mod_group.add_argument("--spectral-scaling", type=float, default=1.1,
-                           help="Spectral radius scaling for recurrent weights (default: 1.1)")
 
     # TRAIN command
     train_parser = subparsers.add_parser("train", help="Train an existing model")
@@ -786,7 +770,6 @@ Examples:
             name=args.name,
             n_units=args.units,
             modular=args.modular,
-            module_sizes=args.module_sizes,
             episode_duration=args.duration,
             proprioception_delay=args.proprio_delay,
             vision_delay=args.vision_delay,
@@ -794,11 +777,6 @@ Examples:
             vision_noise=args.vision_noise,
             action_noise=args.action_noise,
             learning_rate=args.learning_rate,
-            vision_mask=args.vision_mask,
-            proprio_mask=args.proprio_mask,
-            task_mask=args.task_mask,
-            output_mask=args.output_mask,
-            spectral_scaling=args.spectral_scaling
         )
 
     elif args.command == "train":
