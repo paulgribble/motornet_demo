@@ -67,8 +67,6 @@ class ModelConfig:
     name: str
     n_units: int = 256
     modular: bool = False
-    module_sizes: list = field(default_factory=lambda: [256, 256, 256, 64])
-    module_names: list = field(default_factory=lambda: ["premotor", "motor", "somatosensory", "spinal"])
     episode_duration: float = 3.0
     proprioception_delay: float = 0.02
     vision_delay: float = 0.07
@@ -78,16 +76,17 @@ class ModelConfig:
     learning_rate: float = 1e-3
 
     # Modular-specific parameters (used only when modular=True)
-    vision_mask: list = field(default_factory=lambda:  [0.3, 0.0, 0.0, 0.0])
-    proprio_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.1, 0.3])
-    task_mask: list = field(default_factory=lambda:    [0.3, 0.01, 0.0, 0.0])
+    module_names: list = field(default_factory=lambda: ["motor", "somatosensory", "spinal"])
+    module_sizes: list = field(default_factory=lambda: [256, 256, 64])
+    vision_mask: list = field(default_factory=lambda:  [0.5, 0.0, 0.0])
+    proprio_mask: list = field(default_factory=lambda: [0.0, 0.3, 0.5])
+    task_mask: list = field(default_factory=lambda:    [0.5, 0.0, 0.0])
     connectivity_mask: list = field(default_factory=lambda: [
-        [0.70, 0.10, 0.00, 0.00],
-        [0.30, 0.70, 0.20, 0.00],
-        [0.00, 0.05, 0.70, 0.10],
-        [0.00, 0.30, 0.05, 0.70]
+        [0.70, 0.05, 0.30],
+        [0.05, 0.70, 0.05],
+        [0.10, 0.10, 0.70]
     ])
-    output_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.5])
+    output_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.5])
     spectral_scaling: float = 1.1
 
     def to_dict(self) -> dict:
