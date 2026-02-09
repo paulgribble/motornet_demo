@@ -139,12 +139,11 @@ Each model is stored as a directory containing:
 All operations are available from the command line:
 
 ```bash
-# Create a model
+# Create a model (uses default parameters)
 uv run reaching_model.py create my_model
-uv run reaching_model.py create my_model --vision-delay 0.10
 
 # Train
-uv run reaching_model.py train my_model --batches 10000 --batch-size 64
+uv run reaching_model.py train my_model --batches 10000
 uv run reaching_model.py train my_model --batches 5000 --ff 15.0
 
 # Test
@@ -161,7 +160,7 @@ uv run reaching_model.py save my_model my_model_backup
 uv run reaching_model.py arch
 ```
 
-Run `uv run reaching_model.py create --help` for the full list of creation options (delays, noise levels, etc.).
+CLI options for `train`: `--batches`, `--batch-size`, `--ff`, `--task` (random or center_out). CLI options for `test`: `--targets`, `--ff`. To customize model parameters (delays, noise, module sizes, etc.), use the Python API.
 
 ## Task Structure
 
@@ -265,7 +264,7 @@ model.test(n_targets=8, ff_strength=15.0)  # Adapted performance
 model.test(n_targets=8, ff_strength=0.0)   # After-effects
 ```
 
-### Vary sensory parameters
+### Vary sensory parameters (Python API only)
 
 ```python
 # High noise, long delays

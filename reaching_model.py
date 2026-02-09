@@ -19,8 +19,8 @@ Example usage (API):
 
 Example usage (CLI):
     uv run reaching_model.py create my_model
-    uv run reaching_model.py train my_model --batches 10000 --batch-size 64
-    uv run reaching_model.py test my_model --targets 8 --ff 15.0
+    uv run reaching_model.py train my_model --batches 10000
+    uv run reaching_model.py test my_model --targets 8
 """
 
 from __future__ import annotations
@@ -761,67 +761,19 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  Create a model:
-    %(prog)s create my_model
-    %(prog)s create my_model --vision-delay 0.10
-
-  Train a model:
-    %(prog)s train my_model --batches 10000 --batch-size 64
-    %(prog)s train my_model --batches 5000 --ff 15.0
-
-  Test a model:
-    %(prog)s test my_model --targets 8
-    %(prog)s test my_model --targets 8 --ff 15.0
-
-  Show model info:
-    %(prog)s info my_model
-
-  Show architecture details:
-    %(prog)s arch
+  %(prog)s create my_model
+  %(prog)s train my_model --batches 10000
+  %(prog)s test my_model --targets 8 --ff 15.0
+  %(prog)s info my_model
+  %(prog)s arch
         """
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     # CREATE command
-    create_parser = subparsers.add_parser("create", help="Create a new model",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Architecture: 4-module modular GRU
-  PMd(256) + M1(256) + S1(128) + SC(64) = 704 units total
-
-Examples:
-  %(prog)s my_model
-  %(prog)s my_model --vision-delay 0.10
-  %(prog)s noisy --proprio-noise 0.005 --vision-noise 0.003
-        """)
+    create_parser = subparsers.add_parser("create", help="Create a new model")
     create_parser.add_argument("name", help="Name for the model")
-
-    # Episode options
-    ep_group = create_parser.add_argument_group("Episode settings")
-    ep_group.add_argument("--duration", type=float, default=3.0,
-                          help="Episode duration in seconds (default: 3.0)")
-
-    # Sensory delay options
-    delay_group = create_parser.add_argument_group("Sensory delays (seconds)")
-    delay_group.add_argument("--proprio-delay", type=float, default=0.02,
-                             help="Proprioceptive feedback delay (default: 0.02)")
-    delay_group.add_argument("--vision-delay", type=float, default=0.08,
-                             help="Visual feedback delay (default: 0.08)")
-
-    # Noise options
-    noise_group = create_parser.add_argument_group("Noise levels (std dev)")
-    noise_group.add_argument("--proprio-noise", type=float, default=1e-3,
-                             help="Proprioceptive noise (default: 0.001)")
-    noise_group.add_argument("--vision-noise", type=float, default=1e-3,
-                             help="Visual noise (default: 0.001)")
-    noise_group.add_argument("--action-noise", type=float, default=1e-4,
-                             help="Motor command noise (default: 0.0001)")
-
-    # Learning options
-    learn_group = create_parser.add_argument_group("Learning")
-    learn_group.add_argument("--learning-rate", type=float, default=1e-3,
-                             help="Optimizer learning rate (default: 0.001)")
 
     # TRAIN command
     train_parser = subparsers.add_parser("train", help="Train an existing model")
@@ -831,17 +783,12 @@ Examples:
     train_parser.add_argument("--ff", type=float, default=0.0, help="Force field strength (default: 0.0)")
     train_parser.add_argument("--task", choices=["random", "center_out"], default="random",
                               help="Training task type (default: random)")
-    train_parser.add_argument("--plot-interval", type=int, default=100,
-                              help="Batches between plot updates (default: 100, 0 to disable)")
-    train_parser.add_argument("--quiet", action="store_true", help="Suppress progress output")
 
     # TEST command
     test_parser = subparsers.add_parser("test", help="Test a trained model")
     test_parser.add_argument("name", help="Name of the model to test")
     test_parser.add_argument("--targets", type=int, default=8, help="Number of targets (default: 8)")
     test_parser.add_argument("--ff", type=float, default=0.0, help="Force field strength (default: 0.0)")
-    test_parser.add_argument("--no-plots", action="store_true", help="Don't save plots")
-    test_parser.add_argument("--no-data", action="store_true", help="Don't save episode data")
 
     # INFO command
     info_parser = subparsers.add_parser("info", help="Show model information")
@@ -863,16 +810,7 @@ Examples:
 
     # Execute command
     if args.command == "create":
-        ReachingModel.create(
-            name=args.name,
-            episode_duration=args.duration,
-            proprioception_delay=args.proprio_delay,
-            vision_delay=args.vision_delay,
-            proprioception_noise=args.proprio_noise,
-            vision_noise=args.vision_noise,
-            action_noise=args.action_noise,
-            learning_rate=args.learning_rate,
-        )
+        ReachingModel.create(name=args.name)
 
     elif args.command == "train":
         model = ReachingModel.load(args.name)
@@ -881,8 +819,6 @@ Examples:
             batch_size=args.batch_size,
             ff_strength=args.ff,
             task_mode=args.task,
-            plot_interval=args.plot_interval,
-            quiet=args.quiet
         )
 
     elif args.command == "test":
@@ -890,8 +826,6 @@ Examples:
         model.test(
             n_targets=args.targets,
             ff_strength=args.ff,
-            save_plots=not args.no_plots,
-            save_data=not args.no_data
         )
 
     elif args.command == "info":
