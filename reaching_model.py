@@ -78,13 +78,13 @@ class ModelConfig:
     # Modular-specific parameters (used only when modular=True)
     module_names: list = field(default_factory=lambda: ["motor", "somatosensory", "spinal"])
     module_sizes: list = field(default_factory=lambda: [256, 256, 64])
-    vision_mask: list = field(default_factory=lambda:  [0.5, 0.0, 0.0])
-    proprio_mask: list = field(default_factory=lambda: [0.0, 0.3, 0.5])
-    task_mask: list = field(default_factory=lambda:    [0.5, 0.0, 0.0])
+    vision_mask: list = field(default_factory=lambda:  [0.50, 0.00, 0.00])
+    proprio_mask: list = field(default_factory=lambda: [0.10, 0.30, 0.50])
+    task_mask: list = field(default_factory=lambda:    [0.50, 0.00, 0.00])
     connectivity_mask: list = field(default_factory=lambda: [
         [0.70, 0.05, 0.30],
-        [0.05, 0.70, 0.05],
-        [0.10, 0.10, 0.70]
+        [0.25, 0.70, 0.05],
+        [0.15, 0.15, 0.70]
     ])
     output_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.5])
     spectral_scaling: float = 1.1
