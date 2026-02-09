@@ -74,9 +74,9 @@ Modular-only parameters:
 
 |      Parameter      |                     Default                      |                             Description                             |
 | ------------------- | ------------------------------------------------ | ------------------------------------------------------------------- |
-| `vision_mask`       | [0.2, 0.0, 0.0, 0.0]                             | Connection probability from vision to each module (PMC, M1, S1, SC) |
-| `proprio_mask`      | [0.0, 0.0, 0.5, 0.3]                             | Connection probability from proprioception to each module           |
-| `task_mask`         | [0.7, 0.02, 0.0, 0.0]                            | Connection probability from task inputs to each module              |
+| `vision_mask`       | [0.3, 0.0, 0.0, 0.0]                             | Connection probability from vision to each module (PMC, M1, S1, SC) |
+| `proprio_mask`      | [0.0, 0.0, 0.1, 0.3]                             | Connection probability from proprioception to each module           |
+| `task_mask`         | [0.3, 0.01, 0.0, 0.0]                            | Connection probability from task inputs to each module              |
 | `connectivity_mask` | 4x4 matrix                                       | Inter-module connection probabilities                               |
 | `output_mask`       | [0.0, 0.0, 0.0, 0.5]                             | Connection probability from each module to output                   |
 | `module_names`      | ["premotor", "motor", "somatosensory", "spinal"] | Names for each module                                               |

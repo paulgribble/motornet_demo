@@ -79,13 +79,13 @@ class ModelConfig:
 
     # Modular-specific parameters (used only when modular=True)
     vision_mask: list = field(default_factory=lambda:  [0.3, 0.0, 0.0, 0.0])
-    proprio_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.4, 0.3])
-    task_mask: list = field(default_factory=lambda:    [0.5, 0.0, 0.0, 0.0])
+    proprio_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.1, 0.3])
+    task_mask: list = field(default_factory=lambda:    [0.3, 0.01, 0.0, 0.0])
     connectivity_mask: list = field(default_factory=lambda: [
-        [0.80, 0.10, 0.00, 0.00],
-        [0.35, 0.80, 0.20, 0.00],
-        [0.00, 0.10, 0.80, 0.10],
-        [0.00, 0.20, 0.05, 0.80]
+        [0.70, 0.10, 0.00, 0.00],
+        [0.30, 0.70, 0.20, 0.00],
+        [0.00, 0.05, 0.70, 0.10],
+        [0.00, 0.30, 0.05, 0.70]
     ])
     output_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.0, 0.5])
     spectral_scaling: float = 1.1
