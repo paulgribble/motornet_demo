@@ -591,6 +591,7 @@ class ReachingModel:
             # Intermediate plots
             if plot_interval > 0 and (i + 1) % plot_interval == 0:
                 self._save_training_plots(episode_data, i + 1, batch_size)
+                self.save()
 
         # Final plots and save
         self._save_training_plots(episode_data, n_batches, batch_size)
