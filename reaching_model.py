@@ -230,7 +230,7 @@ class ReachingModel:
 
         # Get input dimensions by generating a sample
         n_t = int(config.episode_duration / env.effector.dt)
-        inputs, _, _, _ = task.generate(1, n_t)
+        inputs, _, _, _, _ = task.generate(1, n_t)
         n_task_inputs = inputs['inputs'].shape[2]
         total_input_size = env.observation_space.shape[0] + n_task_inputs
 
@@ -329,7 +329,7 @@ class ReachingModel:
 
         # Get input dimensions
         n_t = int(config.episode_duration / env.effector.dt)
-        inputs, _, _, _ = task.generate(1, n_t)
+        inputs, _, _, _, _ = task.generate(1, n_t)
         n_task_inputs = inputs['inputs'].shape[2]
         total_input_size = env.observation_space.shape[0] + n_task_inputs
 

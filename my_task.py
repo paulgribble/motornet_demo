@@ -54,15 +54,17 @@ class TaskOutput:
         targets: Target positions for loss calculation (batch_size, n_timesteps, 4)
         init_states: Initial joint states (batch_size, 4)
         delay_go_times: Timestep when go cue appears for each trial (batch_size,)
+        delay_tg_times: Timestep when target appears for each trial (batch_size,)
     """
     inputs: dict
     targets: np.ndarray
     init_states: np.ndarray
     delay_go_times: np.ndarray
+    delay_tg_times: np.ndarray
 
     def __iter__(self):
-        """Allow unpacking: inputs, targets, init_states, delay_go_times = task.generate(...)"""
-        return iter([self.inputs, self.targets, self.init_states, self.delay_go_times])
+        """Allow unpacking: inputs, targets, init_states, delay_go_times, delay_tg_times = task.generate(...)"""
+        return iter([self.inputs, self.targets, self.init_states, self.delay_go_times, self.delay_tg_times])
 
 
 # =============================================================================
@@ -225,7 +227,8 @@ class ExperimentTask:
             inputs={"inputs": inputs},
             targets=targets,
             init_states=init_states,
-            delay_go_times=delay_go_times
+            delay_go_times=delay_go_times,
+            delay_tg_times=delay_tg_times
         )
 
     def _generate_random_init_states(self, batch_size: int) -> np.ndarray:

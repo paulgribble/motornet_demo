@@ -45,7 +45,7 @@ def run_episode(env, task, policy, batch_size, n_t, device, k=0, **kwargs):
     Returns:
         Dictionary containing episode data (xy, hidden, actions, muscle, force, etc.)
     """
-    inputs, targets, init_states, delay_go_times = task.generate(batch_size, n_t, dmax=0.30)
+    inputs, targets, init_states, delay_go_times, delay_tg_times = task.generate(batch_size, n_t, dmax=0.30)
     targets = th.tensor(targets[:, :, 0:2], device=device, dtype=th.float)
     inp = th.tensor(inputs['inputs'], device=device, dtype=th.float)
     init_states = th.tensor(init_states, device=device, dtype=th.float)
@@ -102,7 +102,8 @@ def run_episode(env, task, policy, batch_size, n_t, device, k=0, **kwargs):
         'l1': env.skeleton.l1,
         'l2': env.skeleton.l2,
         'dt': env.dt,
-        'delay_go_times': delay_go_times
+        'delay_go_times': delay_go_times,
+        'delay_tg_times': delay_tg_times
     }
 
 
@@ -419,7 +420,7 @@ def load_model(cfg_file, weight_file):
 
     # Create task to get input dimensions
     task = ExperimentTask(effector=env.effector)
-    inputs, _, _, _ = task.generate(1, 1)
+    inputs, _, _, _, _ = task.generate(1, 1)
     n_task_inputs = inputs['inputs'].shape[2]
     input_size = env.observation_space.shape[0] + n_task_inputs
 
