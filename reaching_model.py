@@ -591,7 +591,7 @@ class ReachingModel:
             # Intermediate plots
             if plot_interval > 0 and (i + 1) % plot_interval == 0:
                 self._save_training_plots(episode_data, i + 1, batch_size)
-                self.save()
+                self.save(quiet=True)
 
         # Final plots and save
         self._save_training_plots(episode_data, n_batches, batch_size)
@@ -677,7 +677,7 @@ class ReachingModel:
 
         return episode_data
 
-    def save(self, name: str = None) -> None:
+    def save(self, name: str = None, quiet: bool = False) -> None:
         """
         Save the model to disk.
 
@@ -709,7 +709,8 @@ class ReachingModel:
         with open(state_file, 'w') as f:
             json.dump(self.training_state.to_dict(), f, indent=2)
 
-        print(f"Saved model to '{model_dir}/'")
+        if not quiet:
+            print(f"Saved model to '{model_dir}/'")
 
     # -------------------------------------------------------------------------
     # Helper Methods
