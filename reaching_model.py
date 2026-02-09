@@ -34,7 +34,7 @@ from dataclasses import dataclass, field, asdict
 from typing import Optional, Literal
 
 # Set threading environment variables BEFORE importing torch/numpy
-os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['OMP_THREADS'] = '1'
 os.environ['MKL_NUM_THREADS'] = '1'
 os.environ['VECLIB_MAXIMUM_THREADS'] = '1'
 
@@ -178,7 +178,7 @@ class ReachingModel:
             name: Name for the model (will create a directory with this name)
             n_units: Number of hidden units (for simple models)
             modular: If True, create a modular architecture with multiple RNN modules
-            module_sizes: List of sizes for each module (modular only). Default: [256, 256, 128, 64]
+            module_sizes: List of sizes for each module (modular only). Default: [256, 128, 64]
             episode_duration: Duration of each simulation episode in seconds
             save: If True, save the model after creation
             **kwargs: Additional configuration parameters
@@ -197,7 +197,7 @@ class ReachingModel:
 
         # Build configuration
         if module_sizes is None:
-            module_sizes = [256, 256, 128, 64]
+            module_sizes = [256, 256, 64]
 
         config = ModelConfig(
             name=name,
