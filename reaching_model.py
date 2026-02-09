@@ -1,24 +1,24 @@
 """
-Reaching Model - A simplified interface for training RNNs to control biomechanical arm models.
+Reaching Model - A simplified interface for training modular RNNs to control a biomechanical arm.
 
-This module provides a high-level API for creating, training, testing, and saving neural network
-models that learn to control a simulated arm to perform reaching movements.
+The architecture is a 4-module modular GRU inspired by the primate motor system:
+  PMd (dorsal premotor) → M1 (motor cortex) → SC (spinal cord)
+                          ↑ S1 (somatosensory cortex)
+
+PMd holds the motor plan during the delay period; at the go cue, PMd→M1 transmits
+initial conditions that launch execution dynamics. Output is from SC only, so cortical
+delay activity is structurally output-null (Kaufman et al., 2014).
 
 Example usage (API):
     from reaching_model import ReachingModel
 
-    # Create and train a new model
-    model = ReachingModel.create("my_model", n_units=256)
+    model = ReachingModel.create("my_model")
     model.train(n_batches=10000, batch_size=64)
     model.test(n_targets=8)
     model.save()
 
-    # Load an existing model
-    model = ReachingModel.load("my_model")
-    model.test(n_targets=8, ff_strength=15.0)
-
 Example usage (CLI):
-    uv run reaching_model.py create my_model --units 256
+    uv run reaching_model.py create my_model
     uv run reaching_model.py train my_model --batches 10000 --batch-size 64
     uv run reaching_model.py test my_model --targets 8 --ff 15.0
 """
@@ -52,9 +52,137 @@ from tqdm import tqdm
 import motornet as mn
 from my_env import ExperimentEnv
 from my_task import ExperimentTask
-from my_policy import Policy, ModularPolicyGRU
-from my_loss import calculate_loss_michaels, calculate_loss_mehrdad
-from my_utils import run_episode, plot_losses, plot_handpaths, plot_signals, plot_signals_modular
+from my_policy import ModularPolicyGRU
+from my_loss import calculate_loss_mehrdad
+from my_utils import run_episode, plot_losses, plot_handpaths, plot_signals
+
+
+# =============================================================================
+# 4-Module Architecture: PMd, M1, S1, SC
+# =============================================================================
+#
+# Anatomically-motivated connectivity for a modular recurrent network
+# controlling a 2-joint, 6-muscle arm model.
+#
+# Mask values are CONNECTION PROBABILITIES: during initialization, each
+# potential synapse is included with this probability, creating structured
+# sparsity that reflects known projection density in the primate motor system.
+#
+# Modules:
+#   [0] PMd — Dorsal premotor cortex (256 units): receives target/go cue and
+#             vision; computes motor plans during the delay period
+#   [1] M1  — Primary motor cortex (256 units): receives plan from PMd,
+#             generates temporally-patterned descending commands
+#   [2] S1  — Somatosensory cortex (128 units): processes proprioception,
+#             projects corrective signals to M1 and plan updates to PMd
+#   [3] SC  — Spinal cord (64 units): alpha motor neurons + local interneuron
+#             circuits; the only module that drives muscle output
+#
+# Key inter-module pathways:
+#   PMd→M1  (0.35): Densest corticocortical motor projection. Primary pathway
+#                    for converting plans into executable commands.
+#   M1→SC   (0.30): Corticospinal tract. Primary descending voluntary pathway.
+#   S1→M1   (0.25): Areas 3a/2 → M1. Critical for online proprioceptive
+#                    correction during reaching.
+#   SC→S1   (0.15): Ascending dorsal columns (cuneate → VPLc → S1).
+#   M1→PMd  (0.15): Execution feedback / efference copy.
+#   S1→PMd  (0.12): Proprioceptive plan updating (area 5 → PMd).
+#   PMd→SC  (0.08): Weak direct PMd corticospinal projections.
+#   SC→M1   (0.08): Long-loop transcortical reflex pathway.
+
+MODULE_PRESET = dict(
+    module_names=["premotor", "motor", "somatosensory", "spinal"],
+    module_sizes=[256, 256, 128, 64],
+    #                          PMd   M1    S1    SC
+    vision_mask=              [0.50, 0.15, 0.00, 0.00],  # dorsal stream: V1→PPC→PMd (primary), PPC→M1 (weak)
+    proprio_mask=             [0.00, 0.10, 0.40, 0.50],  # Ia/Ib: SC direct, S1 via dorsal cols, M1 via VPLo
+    task_mask=                [0.50, 0.10, 0.00, 0.00],  # target/go: PMd primary (PFC/PPC), M1 weak
+    connectivity_mask=[
+        #                      →PMd  →M1   →S1   →SC
+        # from PMd:            self  plan→  negl. weak CST
+        #                            exec
+        [                      0.70, 0.35, 0.02, 0.08],
+        # from M1:             efference self  weak  CST
+        #                      copy              fb
+        [                      0.15, 0.70, 0.05, 0.30],
+        # from S1:             plan  online self  weak
+        #                      update corr.       CST
+        [                      0.12, 0.25, 0.70, 0.05],
+        # from SC:             negl. long  asc.  self
+        #                            loop  dorsal (interneurons)
+        #                                  cols
+        [                      0.02, 0.08, 0.15, 0.70],
+    ],
+    output_mask=              [0.00, 0.00, 0.00, 0.50],  # alpha motor neurons in SC only
+    spectral_scaling=1.15,  # slightly higher for richer preparatory dynamics
+)
+
+
+def print_architecture():
+    """Print a readable summary of the 4-module architecture."""
+    names = MODULE_PRESET['module_names']
+    sizes = MODULE_PRESET['module_sizes']
+    n_mod = len(names)
+    conn = np.array(MODULE_PRESET['connectivity_mask'])
+
+    print("=" * 70)
+    print(f"4-MODULE ARCHITECTURE: {', '.join(n.upper() for n in names)}")
+    print("=" * 70)
+
+    print("\nModules:")
+    for i, (name, size) in enumerate(zip(names, sizes)):
+        print(f"  [{i}] {name:15s}  {size:4d} units")
+    print(f"  {'Total':>20s}: {sum(sizes):4d} units")
+
+    print("\nInput masks (connection probability):")
+    header = "".join(f"{n:>8s}" for n in names)
+    print(f"  {'':15s}{header}")
+    for label, mask in [("Vision", MODULE_PRESET['vision_mask']),
+                        ("Proprioception", MODULE_PRESET['proprio_mask']),
+                        ("Task (tgt, go)", MODULE_PRESET['task_mask'])]:
+        vals = "".join(f"{v:8.2f}" for v in mask)
+        print(f"  {label:15s}{vals}")
+
+    print(f"\nConnectivity (rows=from, cols=to):")
+    header = "".join(f"{'→'+n:>8s}" for n in names)
+    print(f"  {'':15s}{header}")
+    for i, name in enumerate(names):
+        row = conn[i]
+        vals = "".join(f"{v:8.2f}" for v in row)
+        marks = []
+        for j in range(n_mod):
+            if i == j:
+                marks.append("self")
+            elif row[j] >= 0.25:
+                marks.append("★")
+            elif row[j] >= 0.10:
+                marks.append("●")
+            elif row[j] >= 0.05:
+                marks.append("○")
+            else:
+                marks.append("·")
+        print(f"  {name:15s}{vals}   {' '.join(marks)}")
+    print(f"  {'Legend:':>15s} ★ ≥.25  ● ≥.10  ○ ≥.05  · <.05")
+
+    print(f"\nOutput mask:")
+    header = "".join(f"{n:>8s}" for n in names)
+    print(f"  {'':15s}{header}")
+    vals = "".join(f"{v:8.2f}" for v in MODULE_PRESET['output_mask'])
+    print(f"  {'→ muscles':15s}{vals}")
+
+    pathways = []
+    for i in range(n_mod):
+        for j in range(n_mod):
+            if i != j and conn[i][j] >= 0.05:
+                pathways.append((names[i], names[j], conn[i][j]))
+    pathways.sort(key=lambda x: -x[2])
+
+    print(f"\nKey inter-module pathways (sorted by strength):")
+    for src, tgt, prob in pathways:
+        print(f"  {src}→{tgt:15s} p={prob:.2f}")
+
+    print("=" * 70)
+    print()
 
 
 # =============================================================================
@@ -63,37 +191,44 @@ from my_utils import run_episode, plot_losses, plot_handpaths, plot_signals, plo
 
 @dataclass
 class ModelConfig:
-    """Configuration for a reaching model."""
+    """Configuration for a 4-module reaching model (PMd, M1, S1, SC)."""
     name: str
-    n_units: int = 256
-    modular: bool = False
+    n_modules: int = 4
     episode_duration: float = 3.0
     proprioception_delay: float = 0.02
-    vision_delay: float = 0.07
+    vision_delay: float = 0.08
     proprioception_noise: float = 1e-3
     vision_noise: float = 1e-3
     action_noise: float = 1e-4
     learning_rate: float = 1e-3
 
-    # Modular-specific parameters (used only when modular=True)
-    module_names: list = field(default_factory=lambda: ["motor", "somatosensory", "spinal"])
-    module_sizes: list = field(default_factory=lambda: [256, 256, 64])
-    vision_mask: list = field(default_factory=lambda:  [0.50, 0.00, 0.00])
-    proprio_mask: list = field(default_factory=lambda: [0.10, 0.30, 0.50])
-    task_mask: list = field(default_factory=lambda:    [0.50, 0.00, 0.00])
+    # Module parameters (defaults from 4-module preset)
+    module_names: list = field(default_factory=lambda: ["premotor", "motor", "somatosensory", "spinal"])
+    module_sizes: list = field(default_factory=lambda: [256, 256, 128, 64])
+    vision_mask: list = field(default_factory=lambda:  [0.50, 0.15, 0.00, 0.00])
+    proprio_mask: list = field(default_factory=lambda: [0.00, 0.10, 0.40, 0.50])
+    task_mask: list = field(default_factory=lambda:    [0.50, 0.10, 0.00, 0.00])
     connectivity_mask: list = field(default_factory=lambda: [
-        [0.70, 0.05, 0.30],
-        [0.25, 0.70, 0.05],
-        [0.15, 0.15, 0.70]
+        [0.70, 0.35, 0.02, 0.08],
+        [0.15, 0.70, 0.05, 0.30],
+        [0.12, 0.25, 0.70, 0.05],
+        [0.02, 0.08, 0.15, 0.70],
     ])
-    output_mask: list = field(default_factory=lambda: [0.0, 0.0, 0.5])
-    spectral_scaling: float = 1.1
+    output_mask: list = field(default_factory=lambda: [0.00, 0.00, 0.00, 0.50])
+    spectral_scaling: float = 1.15
 
     def to_dict(self) -> dict:
         return asdict(self)
 
     @classmethod
     def from_dict(cls, d: dict) -> "ModelConfig":
+        d = d.copy()
+        # Strip legacy fields that are no longer part of the dataclass
+        d.pop('modular', None)
+        d.pop('n_units', None)
+        # Infer n_modules from module_sizes if missing
+        if 'n_modules' not in d:
+            d['n_modules'] = len(d.get('module_sizes', [256, 256, 128, 64]))
         return cls(**d)
 
 
@@ -123,17 +258,15 @@ class TrainingState:
 
 class ReachingModel:
     """
-    A neural network model that learns to control a simulated arm for reaching tasks.
-
-    This class wraps all the complexity of motornet, providing a simple interface
-    for creating, training, testing, and saving models.
+    A 4-module neural network model that learns to control a simulated arm
+    for reaching tasks (PMd, M1, S1, SC).
 
     Attributes:
         name: The model's name (also used for the save directory)
         config: Model configuration parameters
         env: The motornet environment
         task: The reaching task generator
-        policy: The neural network (GRU or ModularGRU)
+        policy: The modular GRU network
         training_state: Tracks training progress and loss history
     """
 
@@ -164,47 +297,47 @@ class ReachingModel:
     def create(
         cls,
         name: str,
-        n_units: int = 256,
-        modular: bool = False,
         module_sizes: Optional[list] = None,
         episode_duration: float = 3.0,
         save: bool = True,
         **kwargs
     ) -> "ReachingModel":
         """
-        Create a new reaching model with the specified architecture.
+        Create a new 4-module reaching model (PMd, M1, S1, SC).
 
         Args:
             name: Name for the model (will create a directory with this name)
-            n_units: Number of hidden units (for simple models)
-            modular: If True, create a modular architecture with multiple RNN modules
-            module_sizes: List of sizes for each module (modular only). Default: [256, 256, 64]
+            module_sizes: Override default module sizes [256, 256, 128, 64]
             episode_duration: Duration of each simulation episode in seconds
             save: If True, save the model after creation
-            **kwargs: Additional configuration parameters
+            **kwargs: Override any config parameter (e.g. vision_delay=0.10)
 
         Returns:
             A new ReachingModel instance
 
         Example:
-            # Simple model with 256 units
-            model = ReachingModel.create("my_model", n_units=256)
-
-            # Modular model with 3 modules (motor, somatosensory, spinal)
-            model = ReachingModel.create("modular_model", modular=True)
+            model = ReachingModel.create("my_model")
+            model = ReachingModel.create("big", module_sizes=[512, 256, 128, 64])
         """
         device = th.device("cpu")
 
-        # Build configuration
-        if module_sizes is None:
-            module_sizes = [256, 256, 64]
+        # Build configuration from preset + overrides
+        preset = MODULE_PRESET.copy()
+
+        if module_sizes is not None:
+            if len(module_sizes) != 4:
+                raise ValueError(f"Expected 4 module sizes, got {len(module_sizes)}")
+            preset['module_sizes'] = module_sizes
+
+        # User kwargs override preset values
+        for key in list(kwargs.keys()):
+            if key in preset:
+                preset[key] = kwargs.pop(key)
 
         config = ModelConfig(
             name=name,
-            n_units=n_units,
-            modular=modular,
-            module_sizes=module_sizes,
             episode_duration=episode_duration,
+            **preset,
             **kwargs
         )
 
@@ -233,37 +366,28 @@ class ReachingModel:
         n_task_inputs = inputs['inputs'].shape[2]
         total_input_size = env.observation_space.shape[0] + n_task_inputs
 
-        # Create the policy network
-        if modular:
-            # Calculate input dimension indices for the modular network
-            task_dim = np.arange(inputs['inputs'].shape[-1])
-            vision_dim = np.arange(env.get_vision().shape[1]) + task_dim[-1] + 1
-            proprio_dim = np.arange(env.get_proprioception().shape[1]) + vision_dim[-1] + 1
+        # Calculate input dimension indices for the modular network
+        task_dim = np.arange(inputs['inputs'].shape[-1])
+        vision_dim = np.arange(env.get_vision().shape[1]) + task_dim[-1] + 1
+        proprio_dim = np.arange(env.get_proprioception().shape[1]) + vision_dim[-1] + 1
 
-            policy = ModularPolicyGRU(
-                input_size=total_input_size,
-                module_size=config.module_sizes,
-                output_size=env.n_muscles,
-                vision_dim=vision_dim,
-                proprio_dim=proprio_dim,
-                task_dim=task_dim,
-                vision_mask=config.vision_mask,
-                proprio_mask=config.proprio_mask,
-                task_mask=config.task_mask,
-                connectivity_mask=np.array(config.connectivity_mask),
-                output_mask=config.output_mask,
-                connectivity_delay=np.zeros((len(config.module_sizes), len(config.module_sizes))),
-                spectral_scaling=config.spectral_scaling,
-                device=device,
-                activation='tanh'
-            )
-        else:
-            policy = Policy(
-                input_dim=total_input_size,
-                hidden_dim=n_units,
-                output_dim=env.n_muscles,
-                device=device
-            )
+        policy = ModularPolicyGRU(
+            input_size=total_input_size,
+            module_size=config.module_sizes,
+            output_size=env.n_muscles,
+            vision_dim=vision_dim,
+            proprio_dim=proprio_dim,
+            task_dim=task_dim,
+            vision_mask=config.vision_mask,
+            proprio_mask=config.proprio_mask,
+            task_mask=config.task_mask,
+            connectivity_mask=np.array(config.connectivity_mask),
+            output_mask=config.output_mask,
+            connectivity_delay=np.zeros((len(config.module_sizes), len(config.module_sizes))),
+            spectral_scaling=config.spectral_scaling,
+            device=device,
+            activation='tanh'
+        )
 
         model = cls(
             name=name,
@@ -305,6 +429,7 @@ class ReachingModel:
         # Load configuration
         with open(config_file, 'r') as f:
             config_dict = json.load(f)
+
         config = ModelConfig.from_dict(config_dict)
 
         device = th.device("cpu")
@@ -333,35 +458,27 @@ class ReachingModel:
         total_input_size = env.observation_space.shape[0] + n_task_inputs
 
         # Recreate policy
-        if config.modular:
-            task_dim = np.arange(inputs['inputs'].shape[-1])
-            vision_dim = np.arange(env.get_vision().shape[1]) + task_dim[-1] + 1
-            proprio_dim = np.arange(env.get_proprioception().shape[1]) + vision_dim[-1] + 1
+        task_dim = np.arange(inputs['inputs'].shape[-1])
+        vision_dim = np.arange(env.get_vision().shape[1]) + task_dim[-1] + 1
+        proprio_dim = np.arange(env.get_proprioception().shape[1]) + vision_dim[-1] + 1
 
-            policy = ModularPolicyGRU(
-                input_size=total_input_size,
-                module_size=config.module_sizes,
-                output_size=env.n_muscles,
-                vision_dim=vision_dim,
-                proprio_dim=proprio_dim,
-                task_dim=task_dim,
-                vision_mask=config.vision_mask,
-                proprio_mask=config.proprio_mask,
-                task_mask=config.task_mask,
-                connectivity_mask=np.array(config.connectivity_mask),
-                output_mask=config.output_mask,
-                connectivity_delay=np.zeros((len(config.module_sizes), len(config.module_sizes))),
-                spectral_scaling=config.spectral_scaling,
-                device=device,
-                activation='tanh'
-            )
-        else:
-            policy = Policy(
-                input_dim=total_input_size,
-                hidden_dim=config.n_units,
-                output_dim=env.n_muscles,
-                device=device
-            )
+        policy = ModularPolicyGRU(
+            input_size=total_input_size,
+            module_size=config.module_sizes,
+            output_size=env.n_muscles,
+            vision_dim=vision_dim,
+            proprio_dim=proprio_dim,
+            task_dim=task_dim,
+            vision_mask=config.vision_mask,
+            proprio_mask=config.proprio_mask,
+            task_mask=config.task_mask,
+            connectivity_mask=np.array(config.connectivity_mask),
+            output_mask=config.output_mask,
+            connectivity_delay=np.zeros((len(config.module_sizes), len(config.module_sizes))),
+            spectral_scaling=config.spectral_scaling,
+            device=device,
+            activation='tanh'
+        )
 
         # Load weights if they exist
         if os.path.exists(weights_file):
@@ -437,15 +554,9 @@ class ReachingModel:
         # Calculate timesteps
         n_t = int(self.config.episode_duration / self.env.effector.dt)
 
-        # Choose loss function based on model type
-        if self.config.modular:
-            calculate_loss = lambda ep: calculate_loss_mehrdad(ep, self.policy, self.env)
-            plot_signals_fn = plot_signals_modular
-            loss_keys = ["total", "pos", "act", "force", "force_diff", "hdn", "hdn_diff", "weight_decay", "speed", "hdn_jerk"]
-        else:
-            calculate_loss = calculate_loss_michaels
-            plot_signals_fn = plot_signals
-            loss_keys = ["total", "position", "speed", "jerk", "muscle", "muscle_derivative", "hidden", "hidden_derivative"]
+        # Loss function and keys
+        calculate_loss = lambda ep: calculate_loss_mehrdad(ep, self.policy, self.env)
+        loss_keys = ["total", "pos", "act", "force", "force_diff", "hdn", "hdn_diff", "weight_decay", "speed", "hdn_jerk"]
 
         # Initialize loss history if needed
         if not self.training_state.loss_history:
@@ -479,10 +590,10 @@ class ReachingModel:
 
             # Intermediate plots
             if plot_interval > 0 and (i + 1) % plot_interval == 0:
-                self._save_training_plots(episode_data, i + 1, batch_size, plot_signals_fn)
+                self._save_training_plots(episode_data, i + 1, batch_size)
 
         # Final plots and save
-        self._save_training_plots(episode_data, n_batches, batch_size, plot_signals_fn)
+        self._save_training_plots(episode_data, n_batches, batch_size)
         self.save()
 
         if not quiet:
@@ -531,9 +642,6 @@ class ReachingModel:
             n_targets, n_t, self.device, k=ff_strength
         )
 
-        # Choose appropriate plotting function
-        plot_signals_fn = plot_signals_modular if self.config.modular else plot_signals
-
         ff_suffix = f"_ff{ff_strength:.0f}" if ff_strength > 0 else ""
 
         if save_plots:
@@ -546,7 +654,7 @@ class ReachingModel:
 
             # Plot individual trials
             for i in range(n_targets):
-                plot_signals_fn(
+                plot_signals(
                     episode_data=episode_data,
                     fname=os.path.join(self.name, f"{self.name}_test_trial_{i}{ff_suffix}.png"),
                     figtitle=f"Test trial {i}",
@@ -606,7 +714,7 @@ class ReachingModel:
     # Helper Methods
     # -------------------------------------------------------------------------
 
-    def _save_training_plots(self, episode_data, batch_num, batch_size, plot_signals_fn):
+    def _save_training_plots(self, episode_data, batch_num, batch_size):
         """Save intermediate training plots."""
         plot_losses(
             loss_history=self.training_state.loss_history,
@@ -618,7 +726,7 @@ class ReachingModel:
             figtitle=f"Batch {batch_num} (n={batch_size})"
         )
         for j in range(min(4, episode_data['xy'].shape[0])):
-            plot_signals_fn(
+            plot_signals(
                 episode_data=episode_data,
                 fname=os.path.join(self.name, f"{self.name}_signals_{j}.png"),
                 figtitle=f"Batch {batch_num} (n={batch_size})",
@@ -627,19 +735,12 @@ class ReachingModel:
 
     def summary(self) -> str:
         """Return a summary of the model."""
-        arch_type = "Modular" if self.config.modular else "Simple"
-        if self.config.modular:
-            names = getattr(self.config, 'module_names', None)
-            if not names or len(names) != len(self.config.module_sizes):
-                names = [f"module_{i}" for i in range(len(self.config.module_sizes))]
-            modules_detail = ", ".join(f"{n}({s})" for n, s in zip(names, self.config.module_sizes))
-            units_str = f"modules: [{modules_detail}]"
-        else:
-            units_str = f"{self.config.n_units} units"
-
+        modules_detail = ", ".join(
+            f"{n}({s})" for n, s in zip(self.config.module_names, self.config.module_sizes)
+        )
         return (
             f"ReachingModel '{self.name}'\n"
-            f"  Architecture: {arch_type} GRU ({units_str})\n"
+            f"  Architecture: [{modules_detail}]\n"
             f"  Episode duration: {self.config.episode_duration}s\n"
             f"  Batches trained: {self.training_state.batches_completed}\n"
             f"  Directory: {self.name}/"
@@ -656,13 +757,13 @@ class ReachingModel:
 def main():
     """Command-line interface for ReachingModel."""
     parser = argparse.ArgumentParser(
-        description="Train and test neural networks for arm reaching movements.",
+        description="Train and test 4-module neural networks for arm reaching movements.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  Create a new model:
-    %(prog)s create my_model --units 256
-    %(prog)s create modular_model --modular
+  Create a model:
+    %(prog)s create my_model
+    %(prog)s create my_model --vision-delay 0.10
 
   Train a model:
     %(prog)s train my_model --batches 10000 --batch-size 64
@@ -674,6 +775,9 @@ Examples:
 
   Show model info:
     %(prog)s info my_model
+
+  Show architecture details:
+    %(prog)s arch
         """
     )
 
@@ -683,24 +787,15 @@ Examples:
     create_parser = subparsers.add_parser("create", help="Create a new model",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
+Architecture: 4-module modular GRU
+  PMd(256) + M1(256) + S1(128) + SC(64) = 704 units total
+
 Examples:
-  Simple model with custom delays:
-    %(prog)s my_model --proprio-delay 0.04 --vision-delay 0.12
-
-  Model with high noise:
-    %(prog)s noisy --proprio-noise 0.005 --vision-noise 0.003
-
-  Modular model (uses ModelConfig defaults):
-    %(prog)s modular --modular
+  %(prog)s my_model
+  %(prog)s my_model --vision-delay 0.10
+  %(prog)s noisy --proprio-noise 0.005 --vision-noise 0.003
         """)
     create_parser.add_argument("name", help="Name for the model")
-
-    # Architecture options
-    arch_group = create_parser.add_argument_group("Architecture")
-    arch_group.add_argument("--units", type=int, default=256,
-                            help="Number of hidden units for simple model (default: 256)")
-    arch_group.add_argument("--modular", action="store_true",
-                            help="Create a modular architecture with multiple RNN modules")
 
     # Episode options
     ep_group = create_parser.add_argument_group("Episode settings")
@@ -711,8 +806,8 @@ Examples:
     delay_group = create_parser.add_argument_group("Sensory delays (seconds)")
     delay_group.add_argument("--proprio-delay", type=float, default=0.02,
                              help="Proprioceptive feedback delay (default: 0.02)")
-    delay_group.add_argument("--vision-delay", type=float, default=0.07,
-                             help="Visual feedback delay (default: 0.07)")
+    delay_group.add_argument("--vision-delay", type=float, default=0.08,
+                             help="Visual feedback delay (default: 0.08)")
 
     # Noise options
     noise_group = create_parser.add_argument_group("Noise levels (std dev)")
@@ -757,6 +852,9 @@ Examples:
     save_parser.add_argument("name", help="Current model name")
     save_parser.add_argument("new_name", help="New name for the model")
 
+    # ARCH command — show architecture details
+    arch_parser = subparsers.add_parser("arch", help="Show architecture details")
+
     args = parser.parse_args()
 
     if args.command is None:
@@ -767,8 +865,6 @@ Examples:
     if args.command == "create":
         ReachingModel.create(
             name=args.name,
-            n_units=args.units,
-            modular=args.modular,
             episode_duration=args.duration,
             proprioception_delay=args.proprio_delay,
             vision_delay=args.vision_delay,
@@ -805,6 +901,9 @@ Examples:
     elif args.command == "save":
         model = ReachingModel.load(args.name)
         model.save(args.new_name)
+
+    elif args.command == "arch":
+        print_architecture()
 
 
 if __name__ == "__main__":

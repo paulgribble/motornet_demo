@@ -2,7 +2,7 @@
 Quickstart example for ReachingModel.
 
 This script demonstrates how to use the ReachingModel API to:
-1. Create a new model
+1. Create a new model (4-module: PMd, M1, S1, SC)
 2. Train it on reaching movements
 3. Test it on center-out reaching
 4. Save and reload the model
@@ -13,19 +13,15 @@ from reaching_model import ReachingModel
 import numpy as np
 
 # =============================================================================
-# Example 1: Create and train a simple model
+# Example 1: Create and train a model with default settings
 # =============================================================================
 
 print("=" * 60)
-print("Example 1: Simple GRU Model")
+print("Example 1: Default Model (PMd, M1, S1, SC)")
 print("=" * 60)
 
-# Create a new model with 128 hidden units
-model = ReachingModel.create(
-    name="example_simple",
-    n_units=128,
-    modular=False
-)
+# Create a new 4-module model with default settings
+model = ReachingModel.create(name="example_default")
 
 # Train for a small number of batches (for demonstration)
 # In practice, you'd use 10000+ batches
@@ -47,21 +43,20 @@ print(f"\nModel summary:\n{model}")
 
 
 # =============================================================================
-# Example 2: Create and train a modular model
+# Example 2: Create a model with custom module sizes
 # =============================================================================
 
 print("\n" + "=" * 60)
-print("Example 2: Modular GRU Model")
+print("Example 2: Custom Module Sizes")
 print("=" * 60)
 
-# Create a modular model with 3 interconnected modules
+# Create a model with larger PMd and M1, smaller S1 and SC
 model = ReachingModel.create(
-    name="example_modular",
-    modular=True,
-    module_sizes=[128, 128, 32]  # Sizes of each module
+    name="example_custom_sizes",
+    module_sizes=[512, 256, 128, 64]
 )
 
-# Train the modular model
+# Train the model
 model.train(
     n_batches=100,
     batch_size=32,
@@ -83,7 +78,7 @@ print("Example 3: Load and Continue Training")
 print("=" * 60)
 
 # Load the previously saved model
-model = ReachingModel.load("example_simple")
+model = ReachingModel.load("example_default")
 print(f"Loaded model with {model.training_state.batches_completed} batches trained")
 
 # Continue training
@@ -99,7 +94,7 @@ print("\n" + "=" * 60)
 print("Example 4: Test with Force Field")
 print("=" * 60)
 
-model = ReachingModel.load("example_simple")
+model = ReachingModel.load("example_default")
 
 # Test with a velocity-dependent curl force field
 model.test(
@@ -109,26 +104,24 @@ model.test(
 
 
 # =============================================================================
-# Example 5: Custom configuration - Simple model with modified delays/noise
+# Example 5: Custom sensory delays and noise
 # =============================================================================
 
 print("\n" + "=" * 60)
-print("Example 5: Custom Configuration (Simple Model)")
+print("Example 5: Custom Sensory Configuration")
 print("=" * 60)
 
 # Create a model with custom sensory delays and noise levels
 # This simulates different neural processing conditions
 model = ReachingModel.create(
-    name="example_custom_simple",
-    n_units=256,
-    modular=False,
+    name="example_custom_sensory",
 
     # Episode settings
     episode_duration=2.5,           # Shorter episodes (2.5s instead of 3.0s)
 
     # Sensory delays (in seconds)
     proprioception_delay=0.03,      # Slower proprioceptive feedback (30ms vs 20ms)
-    vision_delay=0.10,              # Slower visual feedback (100ms vs 70ms)
+    vision_delay=0.10,              # Slower visual feedback (100ms vs 80ms)
 
     # Noise levels (standard deviation)
     proprioception_noise=2e-3,      # More proprioceptive noise
@@ -151,43 +144,43 @@ model.train(n_batches=100, batch_size=32, plot_interval=0)
 
 
 # =============================================================================
-# Example 6: Custom configuration - Modular model with modified connectivity
+# Example 6: Custom connectivity masks
 # =============================================================================
 
 print("\n" + "=" * 60)
-print("Example 6: Custom Configuration (Modular Model)")
+print("Example 6: Custom Connectivity")
 print("=" * 60)
 
-# Create a modular model with custom connectivity patterns
+# Create a model with custom connectivity patterns
 # This allows you to design specific network architectures
 
-# Define a custom connectivity matrix (3 modules)
+# Define a custom connectivity matrix (4 modules: PMd, M1, S1, SC)
 # Values represent connection probability between modules
-# Row i, Col j = probability of connection FROM module j TO module i
+# Row i, Col j = probability of connection FROM module i TO module j
 custom_connectivity = [
-    [1.0, 0.1, 0.0],   # Module 0: receives from self (100%), module 1 (10%), not module 2
-    [0.3, 1.0, 0.3],   # Module 1: receives from all (hub module)
-    [0.0, 0.2, 1.0]    # Module 2: receives from module 1 (20%) and self (100%)
+    [0.80, 0.40, 0.05, 0.10],   # PMd: strong self + M1 projection
+    [0.20, 0.80, 0.10, 0.35],   # M1: strong self + SC (corticospinal)
+    [0.15, 0.30, 0.80, 0.08],   # S1: strong self + M1 (online correction)
+    [0.05, 0.10, 0.20, 0.80]    # SC: strong self + ascending to S1
 ]
 
 model = ReachingModel.create(
-    name="example_custom_modular",
-    modular=True,
+    name="example_custom_conn",
 
     # Module architecture
-    module_sizes=[200, 100, 50],     # Asymmetric module sizes
+    module_sizes=[256, 256, 128, 64],
 
     # Input connectivity masks (which modules receive which inputs)
-    # Values are connection probabilities for each module
-    vision_mask=[0.3, 0.1, 0.0],     # Vision mainly to module 0
-    proprio_mask=[0.0, 0.1, 0.6],    # Proprioception mainly to module 2
-    task_mask=[0.3, 0.1, 0.0],       # Task info mainly to module 0
+    # Values are connection probabilities for each module [PMd, M1, S1, SC]
+    vision_mask=[0.40, 0.10, 0.00, 0.00],     # Vision mainly to PMd
+    proprio_mask=[0.00, 0.10, 0.30, 0.50],    # Proprioception mainly to SC and S1
+    task_mask=[0.40, 0.10, 0.00, 0.00],       # Task info mainly to PMd
 
     # Inter-module connectivity
     connectivity_mask=custom_connectivity,
 
     # Output connectivity (which modules drive muscles)
-    output_mask=[0.0, 0.1, 0.6],     # Output mainly from module 2
+    output_mask=[0.00, 0.00, 0.00, 0.60],     # Output only from SC
 
     # Recurrent dynamics
     spectral_scaling=1.2,            # Slightly stronger recurrence
@@ -195,92 +188,35 @@ model = ReachingModel.create(
     # Sensory parameters
     episode_duration=3.0,
     proprioception_delay=0.02,
-    vision_delay=0.07,
+    vision_delay=0.08,
     learning_rate=1e-3
 )
 
-print(f"Created modular model with custom connectivity:")
+print(f"Created model with custom connectivity:")
 print(f"  Module sizes: {model.config.module_sizes}")
 print(f"  Vision mask: {model.config.vision_mask}")
 print(f"  Proprio mask: {model.config.proprio_mask}")
 print(f"  Output mask: {model.config.output_mask}")
 print(f"  Connectivity matrix:")
 for i, row in enumerate(model.config.connectivity_mask):
-    print(f"    Module {i} receives: {row}")
+    print(f"    Module {i} ({model.config.module_names[i]}): {row}")
 
-# Train the custom modular model
+# Train the custom model
 model.train(n_batches=100, batch_size=32, plot_interval=0)
 model.test(n_targets=8)
 
 
 # =============================================================================
-# Example 7: Biologically-inspired configuration
+# Example 7: High-noise / challenging conditions
 # =============================================================================
 
 print("\n" + "=" * 60)
-print("Example 7: Biologically-Inspired Architecture")
-print("=" * 60)
-
-# Create a model inspired by cortical motor control hierarchy:
-# - Module 0: "Premotor" - receives visual/task info, plans movements
-# - Module 1: "Motor cortex" - integrates all info, central hub
-# - Module 2: "Spinal/output" - receives proprioception, generates commands
-
-model = ReachingModel.create(
-    name="example_bio_inspired",
-    modular=True,
-
-    # Cortical hierarchy sizes
-    module_sizes=[256, 256, 64],     # Premotor, Motor, Spinal
-
-    # Input routing (mimics sensory pathways)
-    vision_mask=[0.3, 0.05, 0.0],    # Vision -> Premotor (dorsal stream)
-    task_mask=[0.3, 0.05, 0.0],      # Goals -> Premotor (prefrontal input)
-    proprio_mask=[0.0, 0.05, 0.5],   # Proprioception -> Spinal (reflex arcs)
-
-    # Hierarchical connectivity (feedforward + feedback)
-    connectivity_mask=[
-        [1.0, 0.2, 0.0],   # Premotor: self + feedback from Motor
-        [0.3, 1.0, 0.2],   # Motor: feedforward from Premotor + feedback from Spinal
-        [0.0, 0.3, 1.0]    # Spinal: feedforward from Motor + self
-    ],
-
-    # Output only from "spinal" module
-    output_mask=[0.0, 0.0, 0.6],
-
-    # Realistic delays
-    proprioception_delay=0.02,       # Fast spinal reflexes
-    vision_delay=0.08,               # Slower visual processing
-
-    # Moderate noise
-    proprioception_noise=1e-3,
-    vision_noise=1e-3,
-    action_noise=1e-4,
-
-    spectral_scaling=1.1
-)
-
-print("Created biologically-inspired hierarchical model")
-print("  Premotor (256 units): receives vision + task goals")
-print("  Motor cortex (256 units): integration hub")
-print("  Spinal (64 units): proprioception + motor output")
-
-model.train(n_batches=100, batch_size=32, plot_interval=0)
-
-
-# =============================================================================
-# Example 8: High-noise / challenging conditions
-# =============================================================================
-
-print("\n" + "=" * 60)
-print("Example 8: Challenging Sensorimotor Conditions")
+print("Example 7: Challenging Sensorimotor Conditions")
 print("=" * 60)
 
 # Simulate challenging conditions (e.g., aging, neurological conditions)
 model = ReachingModel.create(
     name="example_challenging",
-    n_units=256,
-    modular=False,
 
     # Increased delays (slower processing)
     proprioception_delay=0.05,       # 50ms proprioceptive delay
@@ -310,11 +246,10 @@ print("\n" + "=" * 60)
 print("All examples complete!")
 print("=" * 60)
 print("\nCheck these directories for results:")
-print("  - example_simple/")
-print("  - example_modular/")
-print("  - example_custom_simple/")
-print("  - example_custom_modular/")
-print("  - example_bio_inspired/")
+print("  - example_default/")
+print("  - example_custom_sizes/")
+print("  - example_custom_sensory/")
+print("  - example_custom_conn/")
 print("  - example_challenging/")
 
 
@@ -324,6 +259,6 @@ print("  - example_challenging/")
 
 # Uncomment these lines to delete the example models:
 # import shutil
-# for name in ["example_simple", "example_modular", "example_custom_simple",
-#              "example_custom_modular", "example_bio_inspired", "example_challenging"]:
+# for name in ["example_default", "example_custom_sizes", "example_custom_sensory",
+#              "example_custom_conn", "example_challenging"]:
 #     shutil.rmtree(name, ignore_errors=True)

@@ -4,39 +4,39 @@ This document explains how `reaching_model.py` works and what you can do with it
 
 ## Overview
 
-`reaching_model.py` provides a high-level interface for training recurrent neural networks (GRUs) to control a simulated biomechanical arm performing reaching movements. It wraps the [MotorNet](https://github.com/motornet-org/MotorNet) library and handles model creation, training, testing, and saving through both a Python API and a command-line interface.
+`reaching_model.py` provides a high-level interface for training a modular recurrent neural network (GRU) to control a simulated biomechanical arm performing reaching movements. It wraps the [MotorNet](https://github.com/motornet-org/MotorNet) library and handles model creation, training, testing, and saving through both a Python API and a command-line interface.
 
 The simulated arm is a 2-joint (shoulder + elbow), 6-muscle model (`RigidTendonArm26`). The neural network receives sensory feedback (vision, proprioception) and task instructions (target position, go cue), and must learn to produce muscle activation patterns that move the hand to the target.
 
 ## Architecture
 
+The architecture is a 4-module modular GRU inspired by the primate motor system:
+
 ```
 Task inputs ──┐
 (target, go)  │
-              ├──→ GRU (recurrent network) ──→ sigmoid ──→ muscle activations ──→ arm model
-Vision ───────┤                                              (6 muscles)          (2 joints)
-(hand pos)    │
+              ├──→ [PMd] ──→ [M1] ──→ [SC] ──→ sigmoid ──→ muscle activations ──→ arm model
+Vision ───────┤      ↑        ↑                   (6 muscles)                      (2 joints)
+(hand pos)    │     [S1] ─────┘
 Proprioception┘
 (muscle state)
 ```
 
-### Two Network Types
-
-**Simple GRU** (`modular=False`, default): A standard single-module GRU. All inputs feed into one recurrent layer of `n_units` hidden units.
-
-**Modular GRU** (`modular=True`): Multiple GRU modules with structured, sparse connectivity. Each module receives a probabilistic subset of inputs (vision, proprioception, task signals) and has sparse inter-module connections. The default 3-module architecture maps to brain regions involved in primate reaching:
-
-| Module |           Name            | Size |                          Role                           |
-| ------ | ------------------------- | ---- | ------------------------------------------------------- |
-| 0      | Motor cortex (M1)         | 256  | Motor command generation, visual-spatial processing     |
-| 1      | Somatosensory cortex (S1) | 256  | Proprioceptive processing, sensory feedback             |
-| 2      | Spinal cord (SC)          | 64   | Motor output, local reflex circuits                     |
+| Module |             Name             | Size |                            Role                            |
+| ------ | ---------------------------- | ---- | ---------------------------------------------------------- |
+| 0      | Dorsal premotor cortex (PMd) | 256  | Motor planning, receives vision + task goals               |
+| 1      | Primary motor cortex (M1)    | 256  | Motor command generation, receives plan from PMd           |
+| 2      | Somatosensory cortex (S1)    | 128  | Proprioceptive processing, sends corrections to M1 and PMd |
+| 3      | Spinal cord (SC)             | 64   | Alpha motor neurons + local interneuron circuits           |
 
 The connectivity between modules reflects known primate neuroanatomy:
-- **M1 → SC**: Corticospinal tract (primary descending motor pathway)
-- **S1 → M1**: Areas 3a/2 project densely to M1 for online correction
-- **SC → S1**: Ascending sensory pathways (dorsal columns, via thalamus)
-- Vision and task inputs reach M1; proprioception reaches S1 and SC; only SC drives muscle output (motor neurons in the ventral horn).
+- **PMd → M1** (0.35): Densest corticocortical motor projection. Converts plans into executable commands.
+- **M1 → SC** (0.30): Corticospinal tract. Primary descending voluntary pathway.
+- **S1 → M1** (0.25): Areas 3a/2 project to M1 for online proprioceptive correction.
+- **SC → S1** (0.15): Ascending dorsal columns (cuneate → VPLc → S1).
+- **M1 → PMd** (0.15): Execution feedback / efference copy.
+- **S1 → PMd** (0.12): Proprioceptive plan updating (area 5 → PMd).
+- Vision and task inputs reach PMd (primary) and M1 (weak); proprioception reaches S1 and SC; only SC drives muscle output (motor neurons in the ventral horn).
 
 ## Python API
 
@@ -45,39 +45,37 @@ The connectivity between modules reflects known primate neuroanatomy:
 ```python
 from reaching_model import ReachingModel
 
-# Simple model (256-unit GRU)
-model = ReachingModel.create("my_model", n_units=256)
+# Create a model with default settings
+model = ReachingModel.create("my_model")
 
-# Modular model (3 modules: motor, somatosensory, spinal)
-model = ReachingModel.create("modular_model", modular=True, module_sizes=[256, 256, 64])
+# Create with custom module sizes
+model = ReachingModel.create("big_model", module_sizes=[512, 256, 128, 64])
 ```
 
 All configurable parameters at creation time:
 
 |       Parameter        |       Default       |               Description               |
 | ---------------------- | ------------------- | --------------------------------------- |
-| `n_units`              | 256                 | Hidden units (simple model only)        |
-| `modular`              | False               | Use modular architecture                |
-| `module_sizes`         | [256, 256, 64]      | Units per module (modular only)         |
+| `module_sizes`         | [256, 256, 128, 64] | Units per module (PMd, M1, S1, SC)      |
 | `episode_duration`     | 3.0                 | Simulation duration in seconds          |
 | `proprioception_delay` | 0.02                | Proprioceptive feedback delay (seconds) |
-| `vision_delay`         | 0.07                | Visual feedback delay (seconds)         |
+| `vision_delay`         | 0.08                | Visual feedback delay (seconds)         |
 | `proprioception_noise` | 1e-3                | Proprioceptive noise (std dev)          |
 | `vision_noise`         | 1e-3                | Visual noise (std dev)                  |
 | `action_noise`         | 1e-4                | Motor command noise (std dev)           |
 | `learning_rate`        | 1e-3                | Adam optimizer learning rate            |
 
-Modular-only parameters:
+Connectivity parameters (advanced):
 
-|      Parameter      |                     Default                      |                             Description                             |
-| ------------------- | ------------------------------------------------ | ------------------------------------------------------------------- |
-| `vision_mask`       | [0.5, 0.0, 0.0]                          | Connection probability from vision to each module (M1, S1, SC) |
-| `proprio_mask`      | [0.0, 0.3, 0.5]                          | Connection probability from proprioception to each module      |
-| `task_mask`         | [0.5, 0.0, 0.0]                          | Connection probability from task inputs to each module         |
-| `connectivity_mask` | 3x3 matrix                                | Inter-module connection probabilities                          |
-| `output_mask`       | [0.0, 0.0, 0.5]                          | Connection probability from each module to output              |
-| `module_names`      | ["motor", "somatosensory", "spinal"]      | Names for each module                                          |
-| `spectral_scaling`  | 1.1                                       | Spectral radius scaling for recurrent weights                  |
+|      Parameter      |                     Default                      |                        Description                        |
+| ------------------- | ------------------------------------------------ | --------------------------------------------------------- |
+| `vision_mask`       | [0.50, 0.15, 0.00, 0.00]                         | Connection probability from vision to each module         |
+| `proprio_mask`      | [0.00, 0.10, 0.40, 0.50]                         | Connection probability from proprioception to each module |
+| `task_mask`         | [0.50, 0.10, 0.00, 0.00]                         | Connection probability from task inputs to each module    |
+| `connectivity_mask` | 4x4 matrix                                       | Inter-module connection probabilities                     |
+| `output_mask`       | [0.00, 0.00, 0.00, 0.50]                         | Connection probability from each module to output         |
+| `module_names`      | ["premotor", "motor", "somatosensory", "spinal"] | Names for each module                                     |
+| `spectral_scaling`  | 1.15                                             | Spectral radius scaling for recurrent weights             |
 
 ### Training
 
@@ -142,8 +140,8 @@ All operations are available from the command line:
 
 ```bash
 # Create a model
-uv run reaching_model.py create my_model --units 256
-uv run reaching_model.py create modular_model --modular
+uv run reaching_model.py create my_model
+uv run reaching_model.py create my_model --vision-delay 0.10
 
 # Train
 uv run reaching_model.py train my_model --batches 10000 --batch-size 64
@@ -158,9 +156,12 @@ uv run reaching_model.py info my_model
 
 # Save with a new name
 uv run reaching_model.py save my_model my_model_backup
+
+# Show architecture details
+uv run reaching_model.py arch
 ```
 
-Run `uv run reaching_model.py create --help` for the full list of creation options (delays, noise levels, modular masks, etc.).
+Run `uv run reaching_model.py create --help` for the full list of creation options (delays, noise levels, etc.).
 
 ## Task Structure
 
@@ -184,27 +185,9 @@ The network receives at each timestep:
 - **Vision** (2 values): noisy fingertip x, y (delayed by `vision_delay`)
 - **Proprioception** (12 values): normalized muscle lengths and velocities (delayed by `proprioception_delay`)
 
-## Loss Functions
+## Loss Function
 
-The model type determines which loss function is used:
-
-### Simple model: `calculate_loss_michaels`
-
-Based on Michaels et al. (2025). Penalizes:
-
-|     Component     | Weight |             What it penalizes              |
-| ----------------- | ------ | ------------------------------------------ |
-| position          | 1e+3   | Distance from target                       |
-| speed             | 2e+2   | Hand velocity (encourages stopping)        |
-| jerk              | 1e+6   | Hand jerk (encourages smoothness)          |
-| muscle            | 1e+0   | Muscle force (encourages efficiency)       |
-| muscle_derivative | 0      | Force changes (disabled)                   |
-| hidden            | 1e-1   | Hidden unit activity (regularization)      |
-| hidden_derivative | 1e+4   | Hidden activity jerk (stabilizes dynamics) |
-
-### Modular model: `calculate_loss_mehrdad`
-
-Based on Kashefi demo code. Adds weight decay and uses different scaling:
+The model uses `calculate_loss_mehrdad` (based on Kashefi demo code), which includes weight decay:
 
 |  Component   | Weight |      What it penalizes       |
 | ------------ | ------ | ---------------------------- |
@@ -260,10 +243,10 @@ Each signal plot shows 6 panels for a single trial:
 
 ## Typical Workflows
 
-### Train a basic model from scratch
+### Train a model from scratch
 
 ```python
-model = ReachingModel.create("baseline", n_units=256)
+model = ReachingModel.create("baseline")
 model.train(n_batches=10000)
 model.test(n_targets=8)
 ```
@@ -272,7 +255,7 @@ model.test(n_targets=8)
 
 ```python
 # Train without force field
-model = ReachingModel.create("ff_study", n_units=256)
+model = ReachingModel.create("ff_study")
 model.train(n_batches=10000)
 model.test(n_targets=8)                    # Baseline performance
 
@@ -280,16 +263,6 @@ model.test(n_targets=8)                    # Baseline performance
 model.train(n_batches=5000, ff_strength=15.0)
 model.test(n_targets=8, ff_strength=15.0)  # Adapted performance
 model.test(n_targets=8, ff_strength=0.0)   # After-effects
-```
-
-### Compare architectures
-
-```python
-simple = ReachingModel.create("simple_256", n_units=256)
-simple.train(n_batches=10000)
-
-modular = ReachingModel.create("modular_3mod", modular=True, module_sizes=[256, 256, 64])
-modular.train(n_batches=10000)
 ```
 
 ### Vary sensory parameters

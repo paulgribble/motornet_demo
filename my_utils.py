@@ -434,24 +434,17 @@ def load_model(cfg_file, weight_file):
 
         n_modules = len(cfg['module_size'])
 
-        # Read masks from config if present, otherwise use defaults matching module count
-        if n_modules == 3:
-            default_vision = [0.2, 0.0, 0.0]
-            default_proprio = [0.0, 0.0, 0.5]
-            default_task = [0.2, 0.02, 0.0]
-            default_conn = [[1., 0.2, 0.02], [0.2, 1., 0.2], [0., 0.2, 1.]]
-            default_output = [0.0, 0.0, 0.5]
-        else:
-            default_vision = [0.2, 0.0, 0.0, 0.0]
-            default_proprio = [0.0, 0.0, 0.5, 0.3]
-            default_task = [0.2, 0.02, 0.0, 0.0]
-            default_conn = [
-                [1.0, 0.1, 0.05, 0.0],
-                [0.2, 1.0, 0.2, 0.0],
-                [0.05, 0.1, 1.0, 0.1],
-                [0.0, 0.2, 0.05, 1.0]
-            ]
-            default_output = [0.0, 0.0, 0.0, 0.5]
+        # Read masks from config if present, otherwise use 4-module defaults
+        default_vision = [0.2, 0.0, 0.0, 0.0]
+        default_proprio = [0.0, 0.0, 0.5, 0.3]
+        default_task = [0.2, 0.02, 0.0, 0.0]
+        default_conn = [
+            [1.0, 0.1, 0.05, 0.0],
+            [0.2, 1.0, 0.2, 0.0],
+            [0.05, 0.1, 1.0, 0.1],
+            [0.0, 0.2, 0.05, 1.0]
+        ]
+        default_output = [0.0, 0.0, 0.0, 0.5]
 
         vision_mask = cfg.get('vision_mask', default_vision)
         proprio_mask = cfg.get('proprio_mask', default_proprio)

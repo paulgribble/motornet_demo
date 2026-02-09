@@ -14,6 +14,7 @@ class Policy(nn.Module):
         self.gru = nn.GRU(input_dim, hidden_dim, 1, batch_first=True)
         self.fc = nn.Linear(hidden_dim, output_dim)
         self.sigmoid = nn.Sigmoid()
+        self.module_dims = [np.arange(hidden_dim)]  # single module spanning all units
 
         if freeze_output_layer:
             for param in self.fc.parameters():
