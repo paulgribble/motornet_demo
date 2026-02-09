@@ -178,7 +178,7 @@ class ReachingModel:
             name: Name for the model (will create a directory with this name)
             n_units: Number of hidden units (for simple models)
             modular: If True, create a modular architecture with multiple RNN modules
-            module_sizes: List of sizes for each module (modular only). Default: [256, 128, 64]
+            module_sizes: List of sizes for each module (modular only). Default: [256, 256, 64]
             episode_duration: Duration of each simulation episode in seconds
             save: If True, save the model after creation
             **kwargs: Additional configuration parameters
@@ -190,7 +190,7 @@ class ReachingModel:
             # Simple model with 256 units
             model = ReachingModel.create("my_model", n_units=256)
 
-            # Modular model with 4 modules (premotor, motor, somatosensory, spinal)
+            # Modular model with 3 modules (motor, somatosensory, spinal)
             model = ReachingModel.create("modular_model", modular=True)
         """
         device = th.device("cpu")
