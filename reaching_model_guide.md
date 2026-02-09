@@ -318,10 +318,12 @@ fast_vision.train(n_batches=10000)
 model = ReachingModel.load("my_model")
 results = model.test(n_targets=8, save_plots=False, save_data=False)
 
-xy = results['xy']           # (8, timesteps, 4) — x, y, vx, vy
-hidden = results['hidden']   # (8, timesteps, hidden_dim)
-muscle = results['muscle']   # (8, timesteps, 6)
-targets = results['targets'] # (8, timesteps, 2)
-actions = results['actions'] # (8, timesteps, 6)
-joint = results['joint']     # (8, timesteps, 4) — shoulder, elbow, vel_s, vel_e
+xy = results['xy']                       # (8, timesteps, 4) — x, y, vx, vy
+hidden = results['hidden']               # (8, timesteps, hidden_dim)
+muscle = results['muscle']               # (8, timesteps, 6)
+targets = results['targets']             # (8, timesteps, 2)
+actions = results['actions']             # (8, timesteps, 6)
+joint = results['joint']                 # (8, timesteps, 4) — shoulder, elbow, vel_s, vel_e
+delay_tg_times = results['delay_tg_times']  # (8,) — timestep when target appears
+delay_go_times = results['delay_go_times']  # (8,) — timestep when go cue appears
 ```
