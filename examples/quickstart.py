@@ -2,7 +2,7 @@
 Quickstart example for ReachingModel.
 
 This script demonstrates how to use the ReachingModel API to:
-1. Create a new model (4-module: PMd, M1, S1, SC)
+1. Create a new model (3-module: M1, S1, SC)
 2. Train it on reaching movements
 3. Test it on center-out reaching
 4. Save and reload the model
@@ -17,10 +17,10 @@ import numpy as np
 # =============================================================================
 
 print("=" * 60)
-print("Example 1: Default Model (PMd, M1, S1, SC)")
+print("Example 1: Default Model (M1, S1, SC)")
 print("=" * 60)
 
-# Create a new 4-module model with default settings
+# Create a new 3-module model with default settings
 model = ReachingModel.create(name="example_default")
 
 # Train for a small number of batches (for demonstration)
@@ -50,10 +50,10 @@ print("\n" + "=" * 60)
 print("Example 2: Custom Module Sizes")
 print("=" * 60)
 
-# Create a model with larger PMd and M1, smaller S1 and SC
+# Create a model with larger M1, same S1 and SC
 model = ReachingModel.create(
     name="example_custom_sizes",
-    module_sizes=[512, 256, 128, 64]
+    module_sizes=[512, 256, 64]
 )
 
 # Train the model
@@ -154,33 +154,32 @@ print("=" * 60)
 # Create a model with custom connectivity patterns
 # This allows you to design specific network architectures
 
-# Define a custom connectivity matrix (4 modules: PMd, M1, S1, SC)
+# Define a custom connectivity matrix (3 modules: M1, S1, SC)
 # Values represent connection probability between modules
 # Row i, Col j = probability of connection FROM module i TO module j
 custom_connectivity = [
-    [0.80, 0.40, 0.05, 0.10],   # PMd: strong self + M1 projection
-    [0.20, 0.80, 0.10, 0.35],   # M1: strong self + SC (corticospinal)
-    [0.15, 0.30, 0.80, 0.08],   # S1: strong self + M1 (online correction)
-    [0.05, 0.10, 0.20, 0.80]    # SC: strong self + ascending to S1
+    [0.80, 0.10, 0.35],   # M1: strong self + SC (corticospinal)
+    [0.30, 0.80, 0.08],   # S1: strong self + M1 (online correction)
+    [0.10, 0.20, 0.80]    # SC: strong self + ascending to S1
 ]
 
 model = ReachingModel.create(
     name="example_custom_conn",
 
     # Module architecture
-    module_sizes=[256, 256, 128, 64],
+    module_sizes=[256, 256, 64],
 
     # Input connectivity masks (which modules receive which inputs)
-    # Values are connection probabilities for each module [PMd, M1, S1, SC]
-    vision_mask=[0.40, 0.10, 0.00, 0.00],     # Vision mainly to PMd
-    proprio_mask=[0.00, 0.10, 0.30, 0.50],    # Proprioception mainly to SC and S1
-    task_mask=[0.40, 0.10, 0.00, 0.00],       # Task info mainly to PMd
+    # Values are connection probabilities for each module [M1, S1, SC]
+    vision_mask=[0.40, 0.00, 0.00],           # Vision mainly to M1
+    proprio_mask=[0.10, 0.30, 0.50],          # Proprioception mainly to SC and S1
+    task_mask=[0.40, 0.00, 0.00],             # Task info mainly to M1
 
     # Inter-module connectivity
     connectivity_mask=custom_connectivity,
 
     # Output connectivity (which modules drive muscles)
-    output_mask=[0.00, 0.00, 0.00, 0.60],     # Output only from SC
+    output_mask=[0.00, 0.00, 0.60],           # Output only from SC
 
     # Recurrent dynamics
     spectral_scaling=1.2,            # Slightly stronger recurrence

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Command-line examples for ReachingModel (4-module: PMd, M1, S1, SC)
+# Command-line examples for ReachingModel (3-module: M1, S1, SC)
 # Run these from the motornet_demo directory
 
 # =============================================================================

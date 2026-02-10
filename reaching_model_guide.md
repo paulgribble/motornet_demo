@@ -10,33 +10,30 @@ The simulated arm is a 2-joint (shoulder + elbow), 6-muscle model (`RigidTendonA
 
 ## Architecture
 
-The architecture is a 4-module modular GRU inspired by the primate motor system:
+The architecture is a 3-module modular GRU inspired by the primate motor system:
 
 ```
 Task inputs ──┐
 (target, go)  │
-              ├──→ [PMd] ──→ [M1] ──→ [SC] ──→ sigmoid ──→ muscle activations ──→ arm model
-Vision ───────┤      ↑        ↑                   (6 muscles)                      (2 joints)
-(hand pos)    │     [S1] ─────┘
+              ├──→ [M1] ──→ [SC] ──→ sigmoid ──→ muscle activations ──→ arm model
+Vision ───────┤     ↑                  (6 muscles)                      (2 joints)
+(hand pos)    │    [S1]
 Proprioception┘
 (muscle state)
 ```
 
-| Module |             Name             | Size |                            Role                            |
-| ------ | ---------------------------- | ---- | ---------------------------------------------------------- |
-| 0      | Dorsal premotor cortex (PMd) | 256  | Motor planning, receives vision + task goals               |
-| 1      | Primary motor cortex (M1)    | 256  | Motor command generation, receives plan from PMd           |
-| 2      | Somatosensory cortex (S1)    | 128  | Proprioceptive processing, sends corrections to M1 and PMd |
-| 3      | Spinal cord (SC)             | 64   | Alpha motor neurons + local interneuron circuits           |
+| Module |           Name            | Size |                          Role                          |
+| ------ | ------------------------- | ---- | ------------------------------------------------------ |
+| 0      | Primary motor cortex (M1) | 256  | Motor command generation, receives vision + task goals |
+| 1      | Somatosensory cortex (S1) | 256  | Proprioceptive processing, sends corrections to M1     |
+| 2      | Spinal cord (SC)          | 64   | Alpha motor neurons + local interneuron circuits       |
 
 The connectivity between modules reflects known primate neuroanatomy:
-- **PMd → M1** (0.35): Densest corticocortical motor projection. Converts plans into executable commands.
 - **M1 → SC** (0.30): Corticospinal tract. Primary descending voluntary pathway.
 - **S1 → M1** (0.25): Areas 3a/2 project to M1 for online proprioceptive correction.
 - **SC → S1** (0.15): Ascending dorsal columns (cuneate → VPLc → S1).
-- **M1 → PMd** (0.15): Execution feedback / efference copy.
-- **S1 → PMd** (0.12): Proprioceptive plan updating (area 5 → PMd).
-- Vision and task inputs reach PMd (primary) and M1 (weak); proprioception reaches S1 and SC; only SC drives muscle output (motor neurons in the ventral horn).
+- **SC → M1** (0.10): Long-loop transcortical reflex pathway.
+- Vision and task inputs reach M1; proprioception reaches S1 and SC; only SC drives muscle output (motor neurons in the ventral horn).
 
 ## Python API
 
@@ -49,33 +46,33 @@ from reaching_model import ReachingModel
 model = ReachingModel.create("my_model")
 
 # Create with custom module sizes
-model = ReachingModel.create("big_model", module_sizes=[512, 256, 128, 64])
+model = ReachingModel.create("big_model", module_sizes=[512, 256, 64])
 ```
 
 All configurable parameters at creation time:
 
-|       Parameter        |       Default       |               Description               |
-| ---------------------- | ------------------- | --------------------------------------- |
-| `module_sizes`         | [256, 256, 128, 64] | Units per module (PMd, M1, S1, SC)      |
-| `episode_duration`     | 3.0                 | Simulation duration in seconds          |
-| `proprioception_delay` | 0.02                | Proprioceptive feedback delay (seconds) |
-| `vision_delay`         | 0.08                | Visual feedback delay (seconds)         |
-| `proprioception_noise` | 1e-3                | Proprioceptive noise (std dev)          |
-| `vision_noise`         | 1e-3                | Visual noise (std dev)                  |
-| `action_noise`         | 1e-4                | Motor command noise (std dev)           |
-| `learning_rate`        | 1e-3                | Adam optimizer learning rate            |
+|       Parameter        |    Default     |               Description               |
+| ---------------------- | -------------- | --------------------------------------- |
+| `module_sizes`         | [256, 256, 64] | Units per module (M1, S1, SC)           |
+| `episode_duration`     | 3.0            | Simulation duration in seconds          |
+| `proprioception_delay` | 0.02           | Proprioceptive feedback delay (seconds) |
+| `vision_delay`         | 0.08           | Visual feedback delay (seconds)         |
+| `proprioception_noise` | 1e-3           | Proprioceptive noise (std dev)          |
+| `vision_noise`         | 1e-3           | Visual noise (std dev)                  |
+| `action_noise`         | 1e-4           | Motor command noise (std dev)           |
+| `learning_rate`        | 1e-3           | Adam optimizer learning rate            |
 
 Connectivity parameters (advanced):
 
-|      Parameter      |                     Default                      |                        Description                        |
-| ------------------- | ------------------------------------------------ | --------------------------------------------------------- |
-| `vision_mask`       | [0.50, 0.15, 0.00, 0.00]                         | Connection probability from vision to each module         |
-| `proprio_mask`      | [0.00, 0.10, 0.40, 0.50]                         | Connection probability from proprioception to each module |
-| `task_mask`         | [0.50, 0.10, 0.00, 0.00]                         | Connection probability from task inputs to each module    |
-| `connectivity_mask` | 4x4 matrix                                       | Inter-module connection probabilities                     |
-| `output_mask`       | [0.00, 0.00, 0.00, 0.50]                         | Connection probability from each module to output         |
-| `module_names`      | ["premotor", "motor", "somatosensory", "spinal"] | Names for each module                                     |
-| `spectral_scaling`  | 1.15                                             | Spectral radius scaling for recurrent weights             |
+|      Parameter      |                  Default                   |                        Description                        |
+| ------------------- | ------------------------------------------ | --------------------------------------------------------- |
+| `vision_mask`       | [0.50, 0.00, 0.00]                         | Connection probability from vision to each module         |
+| `proprio_mask`      | [0.10, 0.35, 0.50]                         | Connection probability from proprioception to each module |
+| `task_mask`         | [0.50, 0.00, 0.00]                         | Connection probability from task inputs to each module    |
+| `connectivity_mask` | 3x3 matrix                                 | Inter-module connection probabilities                     |
+| `output_mask`       | [0.00, 0.00, 0.50]                         | Connection probability from each module to output         |
+| `module_names`      | ["motor", "somatosensory", "spinal"]       | Names for each module                                     |
+| `spectral_scaling`  | 1.15                                       | Spectral radius scaling for recurrent weights             |
 
 ### Training
 

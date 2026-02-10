@@ -1,13 +1,13 @@
 """
 Reaching Model - A simplified interface for training modular RNNs to control a biomechanical arm.
 
-The architecture is a 4-module modular GRU inspired by the primate motor system:
-  PMd (dorsal premotor) → M1 (motor cortex) → SC (spinal cord)
-                          ↑ S1 (somatosensory cortex)
+The architecture is a 3-module modular GRU inspired by the primate motor system:
+  M1 (motor cortex) → SC (spinal cord)
+  ↑ S1 (somatosensory cortex)
 
-PMd holds the motor plan during the delay period; at the go cue, PMd→M1 transmits
-initial conditions that launch execution dynamics. Output is from SC only, so cortical
-delay activity is structurally output-null (Kaufman et al., 2014).
+M1 receives task inputs (target, go cue) and vision, and generates temporally-
+patterned descending commands. S1 processes proprioception and sends corrective
+signals to M1. Output is from SC only.
 
 Example usage (API):
     from reaching_model import ReachingModel
@@ -58,7 +58,7 @@ from my_utils import run_episode, plot_losses, plot_handpaths, plot_signals
 
 
 # =============================================================================
-# 4-Module Architecture: PMd, M1, S1, SC
+# 3-Module Architecture: M1, S1, SC
 # =============================================================================
 #
 # Anatomically-motivated connectivity for a modular recurrent network
@@ -69,64 +69,53 @@ from my_utils import run_episode, plot_losses, plot_handpaths, plot_signals
 # sparsity that reflects known projection density in the primate motor system.
 #
 # Modules:
-#   [0] PMd — Dorsal premotor cortex (256 units): receives target/go cue and
-#             vision; computes motor plans during the delay period
-#   [1] M1  — Primary motor cortex (256 units): receives plan from PMd,
-#             generates temporally-patterned descending commands
-#   [2] S1  — Somatosensory cortex (128 units): processes proprioception,
-#             projects corrective signals to M1 and plan updates to PMd
-#   [3] SC  — Spinal cord (64 units): alpha motor neurons + local interneuron
+#   [0] M1  — Primary motor cortex (256 units): receives target/go cue and
+#             vision; generates temporally-patterned descending commands
+#   [1] S1  — Somatosensory cortex (256 units): processes proprioception,
+#             projects corrective signals to M1
+#   [2] SC  — Spinal cord (64 units): alpha motor neurons + local interneuron
 #             circuits; the only module that drives muscle output
 #
 # Key inter-module pathways:
-#   PMd→M1  (0.35): Densest corticocortical motor projection. Primary pathway
-#                    for converting plans into executable commands.
 #   M1→SC   (0.30): Corticospinal tract. Primary descending voluntary pathway.
 #   S1→M1   (0.25): Areas 3a/2 → M1. Critical for online proprioceptive
 #                    correction during reaching.
 #   SC→S1   (0.15): Ascending dorsal columns (cuneate → VPLc → S1).
-#   M1→PMd  (0.15): Execution feedback / efference copy.
-#   S1→PMd  (0.12): Proprioceptive plan updating (area 5 → PMd).
-#   PMd→SC  (0.08): Weak direct PMd corticospinal projections.
-#   SC→M1   (0.08): Long-loop transcortical reflex pathway.
+#   SC→M1   (0.10): Long-loop transcortical reflex pathway.
 
 MODULE_PRESET = dict(
-    module_names=["premotor", "motor", "somatosensory", "spinal"],
-    module_sizes=[256, 256, 128, 64],
-    #                          PMd   M1    S1    SC
-    vision_mask=              [0.50, 0.15, 0.00, 0.00],  # dorsal stream: V1→PPC→PMd (primary), PPC→M1 (weak)
-    proprio_mask=             [0.00, 0.10, 0.40, 0.50],  # Ia/Ib: SC direct, S1 via dorsal cols, M1 via VPLo
-    task_mask=                [0.50, 0.10, 0.00, 0.00],  # target/go: PMd primary (PFC/PPC), M1 weak
+    module_names=["motor", "somatosensory", "spinal"],
+    module_sizes=[256, 256, 64],
+    #                          M1    S1    SC
+    vision_mask=              [0.50, 0.00, 0.00],  # dorsal stream to M1
+    proprio_mask=             [0.10, 0.35, 0.50],  # Ia/Ib: SC direct, S1 via dorsal cols, M1 via VPLo
+    task_mask=                [0.50, 0.00, 0.00],  # target/go: M1 primary
     connectivity_mask=[
-        #                      →PMd  →M1   →S1   →SC
-        # from PMd:            self  plan→  negl. weak CST
-        #                            exec
-        [                      0.70, 0.35, 0.02, 0.08],
-        # from M1:             efference self  weak  CST
-        #                      copy              fb
-        [                      0.15, 0.70, 0.05, 0.30],
-        # from S1:             plan  online self  weak
-        #                      update corr.       CST
-        [                      0.12, 0.25, 0.70, 0.05],
-        # from SC:             negl. long  asc.  self
-        #                            loop  dorsal (interneurons)
-        #                                  cols
-        [                      0.02, 0.08, 0.15, 0.70],
+        #                      →M1   →S1   →SC
+        # from M1:             self  weak  CST
+        [                      0.70, 0.05, 0.30],
+        # from S1:             online self  weak
+        #                      corr.
+        [                      0.25, 0.70, 0.05],
+        # from SC:             long  asc.  self
+        #                      loop  dorsal (interneurons)
+        #                            cols
+        [                      0.10, 0.15, 0.70],
     ],
-    output_mask=              [0.00, 0.00, 0.00, 0.50],  # alpha motor neurons in SC only
-    spectral_scaling=1.15,  # slightly higher for richer preparatory dynamics
+    output_mask=              [0.00, 0.00, 0.50],  # alpha motor neurons in SC only
+    spectral_scaling=1.15,
 )
 
 
 def print_architecture():
-    """Print a readable summary of the 4-module architecture."""
+    """Print a readable summary of the 3-module architecture."""
     names = MODULE_PRESET['module_names']
     sizes = MODULE_PRESET['module_sizes']
     n_mod = len(names)
     conn = np.array(MODULE_PRESET['connectivity_mask'])
 
     print("=" * 70)
-    print(f"4-MODULE ARCHITECTURE: {', '.join(n.upper() for n in names)}")
+    print(f"{n_mod}-MODULE ARCHITECTURE: {', '.join(n.upper() for n in names)}")
     print("=" * 70)
 
     print("\nModules:")
@@ -191,9 +180,9 @@ def print_architecture():
 
 @dataclass
 class ModelConfig:
-    """Configuration for a 4-module reaching model (PMd, M1, S1, SC)."""
+    """Configuration for a 3-module reaching model (M1, S1, SC)."""
     name: str
-    n_modules: int = 4
+    n_modules: int = 3
     episode_duration: float = 3.0
     proprioception_delay: float = 0.02
     vision_delay: float = 0.08
@@ -202,19 +191,18 @@ class ModelConfig:
     action_noise: float = 1e-4
     learning_rate: float = 1e-3
 
-    # Module parameters (defaults from 4-module preset)
-    module_names: list = field(default_factory=lambda: ["premotor", "motor", "somatosensory", "spinal"])
-    module_sizes: list = field(default_factory=lambda: [256, 256, 128, 64])
-    vision_mask: list = field(default_factory=lambda:  [0.50, 0.15, 0.00, 0.00])
-    proprio_mask: list = field(default_factory=lambda: [0.00, 0.10, 0.40, 0.50])
-    task_mask: list = field(default_factory=lambda:    [0.50, 0.10, 0.00, 0.00])
+    # Module parameters (defaults from 3-module preset)
+    module_names: list = field(default_factory=lambda: ["motor", "somatosensory", "spinal"])
+    module_sizes: list = field(default_factory=lambda: [256, 256, 64])
+    vision_mask: list = field(default_factory=lambda:  [0.50, 0.00, 0.00])
+    proprio_mask: list = field(default_factory=lambda: [0.10, 0.35, 0.50])
+    task_mask: list = field(default_factory=lambda:    [0.50, 0.00, 0.00])
     connectivity_mask: list = field(default_factory=lambda: [
-        [0.70, 0.35, 0.02, 0.08],
-        [0.15, 0.70, 0.05, 0.30],
-        [0.12, 0.25, 0.70, 0.05],
-        [0.02, 0.08, 0.15, 0.70],
+        [0.70, 0.05, 0.30],
+        [0.25, 0.70, 0.05],
+        [0.10, 0.15, 0.70],
     ])
-    output_mask: list = field(default_factory=lambda: [0.00, 0.00, 0.00, 0.50])
+    output_mask: list = field(default_factory=lambda: [0.00, 0.00, 0.50])
     spectral_scaling: float = 1.15
 
     def to_dict(self) -> dict:
@@ -228,7 +216,7 @@ class ModelConfig:
         d.pop('n_units', None)
         # Infer n_modules from module_sizes if missing
         if 'n_modules' not in d:
-            d['n_modules'] = len(d.get('module_sizes', [256, 256, 128, 64]))
+            d['n_modules'] = len(d.get('module_sizes', [256, 256, 64]))
         return cls(**d)
 
 
@@ -258,8 +246,8 @@ class TrainingState:
 
 class ReachingModel:
     """
-    A 4-module neural network model that learns to control a simulated arm
-    for reaching tasks (PMd, M1, S1, SC).
+    A 3-module neural network model that learns to control a simulated arm
+    for reaching tasks (M1, S1, SC).
 
     Attributes:
         name: The model's name (also used for the save directory)
@@ -303,11 +291,11 @@ class ReachingModel:
         **kwargs
     ) -> "ReachingModel":
         """
-        Create a new 4-module reaching model (PMd, M1, S1, SC).
+        Create a new 3-module reaching model (M1, S1, SC).
 
         Args:
             name: Name for the model (will create a directory with this name)
-            module_sizes: Override default module sizes [256, 256, 128, 64]
+            module_sizes: Override default module sizes [256, 256, 64]
             episode_duration: Duration of each simulation episode in seconds
             save: If True, save the model after creation
             **kwargs: Override any config parameter (e.g. vision_delay=0.10)
@@ -317,7 +305,7 @@ class ReachingModel:
 
         Example:
             model = ReachingModel.create("my_model")
-            model = ReachingModel.create("big", module_sizes=[512, 256, 128, 64])
+            model = ReachingModel.create("big", module_sizes=[512, 256, 64])
         """
         device = th.device("cpu")
 
@@ -325,8 +313,8 @@ class ReachingModel:
         preset = MODULE_PRESET.copy()
 
         if module_sizes is not None:
-            if len(module_sizes) != 4:
-                raise ValueError(f"Expected 4 module sizes, got {len(module_sizes)}")
+            if len(module_sizes) != 3:
+                raise ValueError(f"Expected 3 module sizes, got {len(module_sizes)}")
             preset['module_sizes'] = module_sizes
 
         # User kwargs override preset values
@@ -759,7 +747,7 @@ class ReachingModel:
 def main():
     """Command-line interface for ReachingModel."""
     parser = argparse.ArgumentParser(
-        description="Train and test 4-module neural networks for arm reaching movements.",
+        description="Train and test 3-module neural networks for arm reaching movements.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
