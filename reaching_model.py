@@ -53,7 +53,7 @@ import motornet as mn
 from my_env import ExperimentEnv
 from my_task import ExperimentTask
 from my_policy import ModularPolicyGRU
-from my_loss import calculate_loss_mehrdad
+from my_loss import calculate_loss_modular
 from my_utils import run_episode, plot_losses, plot_handpaths, plot_signals
 
 
@@ -555,7 +555,7 @@ class ReachingModel:
         n_t = int(self.config.episode_duration / self.env.effector.dt)
 
         # Loss function and keys
-        calculate_loss = lambda ep: calculate_loss_mehrdad(ep, self.policy, self.env)
+        calculate_loss = lambda ep: calculate_loss_modular(ep, self.policy, self.env)
         loss_keys = ["total", "pos", "act", "force", "force_diff", "hdn", "hdn_diff", "weight_decay", "speed", "hdn_jerk"]
 
         # Initialize loss history if needed
