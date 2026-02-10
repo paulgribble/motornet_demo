@@ -544,7 +544,7 @@ class ReachingModel:
 
         # Loss function and keys
         calculate_loss = lambda ep: calculate_loss_modular(ep, self.policy, self.env)
-        loss_keys = ["total", "pos", "act", "force", "force_diff", "hdn", "hdn_diff", "weight_decay", "speed", "hdn_jerk"]
+        loss_keys = ["total", "position", "speed", "jerk", "muscle", "hidden", "hidden_jerk", "weight_decay"]
 
         # Initialize loss history if needed
         if not self.training_state.loss_history:
