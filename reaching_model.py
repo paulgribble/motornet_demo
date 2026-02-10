@@ -543,8 +543,8 @@ class ReachingModel:
         n_t = int(self.config.episode_duration / self.env.effector.dt)
 
         # Loss function and keys
-        calculate_loss = lambda ep: calculate_loss_michaels(ep, self.policy, self.env)
-        loss_keys = ["total", "position", "speed", "jerk", "muscle", "hidden", "hidden_jerk", "weight_decay"]
+        calculate_loss = lambda ep: calculate_loss_michaels(ep)
+        loss_keys = ["total", "position", "speed", "jerk", "muscle", "muscle_derivative", "hidden", "hidden_derivative"]
 
         # Initialize loss history if needed
         if not self.training_state.loss_history:
