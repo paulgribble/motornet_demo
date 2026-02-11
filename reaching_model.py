@@ -794,6 +794,8 @@ Examples:
     train_parser.add_argument("--ff", type=float, default=0.0, help="Force field strength (default: 0.0)")
     train_parser.add_argument("--task", choices=["random", "center_out"], default="random",
                               help="Training task type (default: random)")
+    train_parser.add_argument("--targets", type=int, default=8,
+                              help="Number of targets for center_out training (default: 8)")
 
     # TEST command
     test_parser = subparsers.add_parser("test", help="Test a trained model")
@@ -825,9 +827,10 @@ Examples:
 
     elif args.command == "train":
         model = ReachingModel.load(args.name)
+        batch_size = args.targets if args.task == "center_out" else args.batch_size
         model.train(
             n_batches=args.batches,
-            batch_size=args.batch_size,
+            batch_size=batch_size,
             ff_strength=args.ff,
             task_mode=args.task,
         )
