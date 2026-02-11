@@ -38,7 +38,7 @@ def michaels_modular_loss(episode_data):
     losses = {
         'position'         : 1e+3 * th.mean(th.sum(th.abs(episode_data['xy'][:, :, 0:2] - episode_data['targets'][:, :, :2]), dim=-1)),
         'muscle'           : 1e-1 * th.mean(th.sum(episode_data['force'], dim=-1)),
-        'hidden'           : 1e+1 * th.mean(th.square(episode_data['hidden'])),
+        'hidden'           : 1e+2 * th.mean(th.square(episode_data['hidden'])),
         'hidden_derivative': 1e+3 * th.mean(th.sum(th.square(th.diff(episode_data['hidden'], 2, dim=1)), dim=-1)),
         'jerk'             : 1e+5 * th.mean(th.sum(th.square(th.diff(episode_data['xy'][:, :, 2:], 2, dim=1)), dim=-1)),
     }
