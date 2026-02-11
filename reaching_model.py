@@ -564,8 +564,8 @@ class ReachingModel:
         n_t = int(self.config.episode_duration / self.env.effector.dt)
 
         # Loss function and keys
-        calculate_loss = lambda ep: michaels_modular_loss(ep)
-        loss_keys = ["total", "position", "jerk", "muscle", "hidden_derivative"]
+        calculate_loss = michaels_modular_loss
+        loss_keys =calculate_loss(episode_data=None, returnKeys=True)
 
         # Initialize loss history if needed
         if not self.training_state.loss_history:

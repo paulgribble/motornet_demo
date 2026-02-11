@@ -34,16 +34,19 @@ def calculate_loss_kashefi(episode_data):
                       losses['hidden']   + losses['hidden_derivative']
     return losses
 
-def michaels_modular_loss(episode_data):
-    losses = {
-        'position'         : 1e+3 * th.mean(th.sum(th.abs(episode_data['xy'][:, :, 0:2] - episode_data['targets'][:, :, :2]), dim=-1)),
-        'muscle'           : 1e-1 * th.mean(th.sum(episode_data['force'], dim=-1)),
-        'hidden'           : 1e+2 * th.mean(th.square(episode_data['hidden'])),
-        'hidden_derivative': 1e+3 * th.mean(th.sum(th.square(th.diff(episode_data['hidden'], 2, dim=1)), dim=-1)),
-        'jerk'             : 1e+5 * th.mean(th.sum(th.square(th.diff(episode_data['xy'][:, :, 2:], 2, dim=1)), dim=-1)),
-    }
-    losses['total'] = losses['position'] + losses['muscle'] + losses['hidden'] + losses['hidden_derivative'] + losses['jerk']
-    return losses
+def michaels_modular_loss(episode_data=None, returnKeys=False):
+    if returnKeys:
+        return ["total","position","muscle","hidden","hidden_derivative","jerk"]
+    else:
+        losses = {
+            'position'         : 1e+3 * th.mean(th.sum(th.abs(episode_data['xy'][:, :, 0:2] - episode_data['targets'][:, :, :2]), dim=-1)),
+            'muscle'           : 1e-1 * th.mean(th.sum(episode_data['force'], dim=-1)),
+            'hidden'           : 1e+3 * th.mean(th.square(episode_data['hidden'])),
+            'hidden_derivative': 1e+3 * th.mean(th.sum(th.square(th.diff(episode_data['hidden'], 2, dim=1)), dim=-1)),
+            'jerk'             : 1e+5 * th.mean(th.sum(th.square(th.diff(episode_data['xy'][:, :, 2:], 2, dim=1)), dim=-1)),
+        }
+        losses['total'] = losses['position'] + losses['muscle'] + losses['hidden'] + losses['hidden_derivative'] + losses['jerk']
+        return losses
 
 
 def calculate_loss_mehrdad(episode_data, policy, env):
