@@ -473,7 +473,7 @@ def load_model(cfg_file, weight_file):
     else:
         # Simple GRU - infer hidden size from weights
         n_hidden = weights['gru.weight_ih_l0'].shape[0] // 3
-        policy = Policy(input_size, n_hidden, env.n_muscles, device=device)
+        policy = PolicyGRU(input_size, n_hidden, env.n_muscles, device=device)
 
     policy.load_state_dict(weights)
     return env, task, policy, device
