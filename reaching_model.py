@@ -1,13 +1,15 @@
 """
 Reaching Model - A simplified interface for training modular RNNs to control a biomechanical arm.
 
-The architecture is a 3-module modular GRU inspired by the primate motor system:
-  M1 (motor cortex) → SC (spinal cord)
-  ↑ S1 (somatosensory cortex)
+The architecture is a 4-module modular GRU inspired by the primate motor system:
+  PMd (premotor) → M1 (motor cortex) → SC (spinal cord)
+                   ↑↓
+                   S1 (somatosensory) ← SC
 
-M1 receives task inputs (target, go cue) and vision, and generates temporally-
-patterned descending commands. S1 processes proprioception and sends corrective
-signals to M1. Output is from SC only.
+PMd receives task inputs (target, go cue) and vision, and projects to M1.
+M1 receives vision and generates descending commands to SC. S1 receives
+ascending proprioceptive signals from SC and projects corrections to M1.
+Output is from SC only, with a 1-timestep delay.
 
 Example usage (API):
     from reaching_model import ReachingModel
@@ -53,12 +55,12 @@ import motornet as mn
 from my_env import ExperimentEnv
 from my_task import ExperimentTask
 from my_policy import ModularPolicyGRU
-from my_loss import calculate_loss_michaels
+from my_loss import michaels_modular_loss
 from my_utils import run_episode, plot_losses, plot_handpaths, plot_signals
 
 
 # =============================================================================
-# 3-Module Architecture: M1, S1, SC
+# 4-Module Architecture: PMd, M1, S1, SC
 # =============================================================================
 #
 # Anatomically-motivated connectivity for a modular recurrent network
@@ -68,47 +70,55 @@ from my_utils import run_episode, plot_losses, plot_handpaths, plot_signals
 # potential synapse is included with this probability, creating structured
 # sparsity that reflects known projection density in the primate motor system.
 #
-# Modules:
-#   [0] M1  — Primary motor cortex (256 units): receives target/go cue and
-#             vision; generates temporally-patterned descending commands
-#   [1] S1  — Somatosensory cortex (256 units): processes proprioception,
-#             projects corrective signals to M1
-#   [2] SC  — Spinal cord (64 units): alpha motor neurons + local interneuron
-#             circuits; the only module that drives muscle output
+# NOTE: The connectivity_mask is indexed as [receiver, sender]. Row i
+# specifies the probability that module i RECEIVES connections from each
+# other module (columns).
 #
-# Key inter-module pathways:
-#   M1→SC   (0.30): Corticospinal tract. Primary descending voluntary pathway.
-#   S1→M1   (0.25): Areas 3a/2 → M1. Critical for online proprioceptive
-#                    correction during reaching.
-#   SC→S1   (0.15): Ascending dorsal columns (cuneate → VPLc → S1).
-#   SC→M1   (0.10): Long-loop transcortical reflex pathway.
+# Modules:
+#   [0] PMd — Dorsal premotor cortex (128 units): receives task inputs
+#             (target, go cue) and vision; motor planning
+#   [1] M1  — Primary motor cortex (128 units): receives vision and
+#             descending commands from PMd; generates motor output
+#   [2] S1  — Somatosensory cortex (128 units): processes ascending
+#             proprioceptive signals from SC; projects corrections to M1
+#   [3] SC  — Spinal cord (16 units): receives proprioception and
+#             descending commands from M1; drives muscle output
+#
+# Key inter-module pathways (sender → receiver):
+#   PMd ↔ M1  (0.20): Bidirectional premotor-motor connectivity
+#   M1  ↔ S1  (0.20): Bidirectional motor-somatosensory connectivity
+#   M1  → SC  (0.20): Corticospinal tract. Primary descending pathway.
+#   SC  → S1  (1.00): Ascending dorsal columns (strong proprioceptive relay)
 
 MODULE_PRESET = dict(
-    module_names=["motor", "somatosensory", "spinal"],
-    module_sizes=[256, 256, 64],
-    #                          M1    S1    SC
-    vision_mask=              [0.50, 0.00, 0.00],  # dorsal stream to M1
-    proprio_mask=             [0.10, 0.50, 0.20],  # Ia/Ib: SC direct, S1 via dorsal cols, M1 via VPLo
-    task_mask=                [0.50, 0.00, 0.00],  # target/go: M1 primary
+    module_names=["premotor", "motor", "somatosensory", "spinal"],
+    module_sizes=[128, 128, 128, 16],
+    #                          PMd   M1    S1    SC
+    vision_mask=              [1.00, 1.00, 0.00, 0.00],  # dorsal stream to PMd and M1
+    proprio_mask=             [0.00, 0.00, 0.00, 1.00],  # proprioception to SC only
+    task_mask=                [1.00, 0.00, 0.00, 0.00],  # target/go cue to PMd only
     connectivity_mask=[
-        #                      →M1   →S1   →SC
-        # from M1:             self  weak  CST
-        [                      0.70, 0.05, 0.30],
-        # from S1:             online self  weak
-        #                      corr.
-        [                      0.25, 0.70, 0.15],
-        # from SC:             long  asc.  self
-        #                      loop  dorsal (interneurons)
-        #                            cols
-        [                      0.10, 0.50, 0.70],
+        # receiver ←          PMd   M1    S1    SC     (columns = sender)
+        # PMd receives:       self  from M1
+        [                      1.00, 0.20, 0.00, 0.00],
+        # M1 receives:        from  self  from
+        #                     PMd         S1
+        [                      0.20, 1.00, 0.20, 0.00],
+        # S1 receives:              from  self  from SC
+        #                           M1          (ascending)
+        [                      0.00, 0.20, 1.00, 1.00],
+        # SC receives:              from        self
+        #                           M1 (CST)
+        [                      0.00, 0.20, 0.00, 1.00],
     ],
-    output_mask=              [0.00, 0.00, 0.50],  # alpha motor neurons in SC only
+    output_mask=              [0.00, 0.00, 0.00, 1.00],  # alpha motor neurons in SC only
     spectral_scaling=1.15,
+    output_delay=1,
 )
 
 
 def print_architecture():
-    """Print a readable summary of the 3-module architecture."""
+    """Print a readable summary of the module architecture."""
     names = MODULE_PRESET['module_names']
     sizes = MODULE_PRESET['module_sizes']
     n_mod = len(names)
@@ -124,20 +134,20 @@ def print_architecture():
     print(f"  {'Total':>20s}: {sum(sizes):4d} units")
 
     print("\nInput masks (connection probability):")
-    header = "".join(f"{n:>8s}" for n in names)
+    header = "".join(f"{n:>12s}" for n in names)
     print(f"  {'':15s}{header}")
     for label, mask in [("Vision", MODULE_PRESET['vision_mask']),
                         ("Proprioception", MODULE_PRESET['proprio_mask']),
                         ("Task (tgt, go)", MODULE_PRESET['task_mask'])]:
-        vals = "".join(f"{v:8.2f}" for v in mask)
+        vals = "".join(f"{v:12.2f}" for v in mask)
         print(f"  {label:15s}{vals}")
 
-    print(f"\nConnectivity (rows=from, cols=to):")
-    header = "".join(f"{'→'+n:>8s}" for n in names)
+    print(f"\nConnectivity (rows=receiver, cols=sender):")
+    header = "".join(f"{'←'+n:>12s}" for n in names)
     print(f"  {'':15s}{header}")
     for i, name in enumerate(names):
         row = conn[i]
-        vals = "".join(f"{v:8.2f}" for v in row)
+        vals = "".join(f"{v:12.2f}" for v in row)
         marks = []
         for j in range(n_mod):
             if i == j:
@@ -154,21 +164,22 @@ def print_architecture():
     print(f"  {'Legend:':>15s} ★ ≥.25  ● ≥.10  ○ ≥.05  · <.05")
 
     print(f"\nOutput mask:")
-    header = "".join(f"{n:>8s}" for n in names)
+    header = "".join(f"{n:>12s}" for n in names)
     print(f"  {'':15s}{header}")
-    vals = "".join(f"{v:8.2f}" for v in MODULE_PRESET['output_mask'])
-    print(f"  {'→ muscles':15s}{vals}")
+    vals = "".join(f"{v:12.2f}" for v in MODULE_PRESET['output_mask'])
+    print(f"  {'-> muscles':15s}{vals}")
 
     pathways = []
     for i in range(n_mod):
         for j in range(n_mod):
             if i != j and conn[i][j] >= 0.05:
-                pathways.append((names[i], names[j], conn[i][j]))
+                # conn[i][j] = module i receives from module j
+                pathways.append((names[j], names[i], conn[i][j]))
     pathways.sort(key=lambda x: -x[2])
 
     print(f"\nKey inter-module pathways (sorted by strength):")
     for src, tgt, prob in pathways:
-        print(f"  {src}→{tgt:15s} p={prob:.2f}")
+        print(f"  {src} -> {tgt:15s} p={prob:.2f}")
 
     print("=" * 70)
     print()
@@ -180,29 +191,32 @@ def print_architecture():
 
 @dataclass
 class ModelConfig:
-    """Configuration for a 3-module reaching model (M1, S1, SC)."""
+    """Configuration for a modular reaching model (PMd, M1, S1, SC)."""
     name: str
-    n_modules: int = 3
+    n_modules: int = 4
     episode_duration: float = 3.0
-    proprioception_delay: float = 0.02
-    vision_delay: float = 0.08
+    proprioception_delay: float = 0.01
+    vision_delay: float = 0.11
     proprioception_noise: float = 1e-3
     vision_noise: float = 1e-3
     action_noise: float = 1e-4
     learning_rate: float = 1e-3
+    activation: str = 'rect_tanh'
+    output_delay: int = 1
 
-    # Module parameters (defaults from 3-module preset)
-    module_names: list = field(default_factory=lambda: ["motor", "somatosensory", "spinal"])
-    module_sizes: list = field(default_factory=lambda: [256, 256, 64])
-    vision_mask: list = field(default_factory=lambda:  [0.50, 0.00, 0.00])
-    proprio_mask: list = field(default_factory=lambda: [0.10, 0.35, 0.50])
-    task_mask: list = field(default_factory=lambda:    [0.50, 0.00, 0.00])
+    # Module parameters (defaults from 4-module preset)
+    module_names: list = field(default_factory=lambda: ["premotor", "motor", "somatosensory", "spinal"])
+    module_sizes: list = field(default_factory=lambda: [128, 128, 128, 16])
+    vision_mask: list = field(default_factory=lambda:  [1.00, 1.00, 0.00, 0.00])
+    proprio_mask: list = field(default_factory=lambda: [0.00, 0.00, 0.00, 1.00])
+    task_mask: list = field(default_factory=lambda:    [1.00, 0.00, 0.00, 0.00])
     connectivity_mask: list = field(default_factory=lambda: [
-        [0.70, 0.05, 0.30],
-        [0.25, 0.70, 0.05],
-        [0.10, 0.15, 0.70],
+        [1.00, 0.20, 0.00, 0.00],
+        [0.20, 1.00, 0.20, 0.00],
+        [0.00, 0.20, 1.00, 1.00],
+        [0.00, 0.20, 0.00, 1.00],
     ])
-    output_mask: list = field(default_factory=lambda: [0.00, 0.00, 0.50])
+    output_mask: list = field(default_factory=lambda: [0.00, 0.00, 0.00, 1.00])
     spectral_scaling: float = 1.15
 
     def to_dict(self) -> dict:
@@ -216,7 +230,12 @@ class ModelConfig:
         d.pop('n_units', None)
         # Infer n_modules from module_sizes if missing
         if 'n_modules' not in d:
-            d['n_modules'] = len(d.get('module_sizes', [256, 256, 64]))
+            d['n_modules'] = len(d.get('module_sizes', [128, 128, 128, 16]))
+        # Default new fields for legacy configs
+        if 'activation' not in d:
+            d['activation'] = 'rect_tanh'
+        if 'output_delay' not in d:
+            d['output_delay'] = 1
         return cls(**d)
 
 
@@ -246,8 +265,8 @@ class TrainingState:
 
 class ReachingModel:
     """
-    A 3-module neural network model that learns to control a simulated arm
-    for reaching tasks (M1, S1, SC).
+    A 4-module neural network model that learns to control a simulated arm
+    for reaching tasks (PMd, M1, S1, SC).
 
     Attributes:
         name: The model's name (also used for the save directory)
@@ -291,11 +310,11 @@ class ReachingModel:
         **kwargs
     ) -> "ReachingModel":
         """
-        Create a new 3-module reaching model (M1, S1, SC).
+        Create a new 4-module reaching model (PMd, M1, S1, SC).
 
         Args:
             name: Name for the model (will create a directory with this name)
-            module_sizes: Override default module sizes [256, 256, 64]
+            module_sizes: Override default module sizes [128, 128, 128, 16]
             episode_duration: Duration of each simulation episode in seconds
             save: If True, save the model after creation
             **kwargs: Override any config parameter (e.g. vision_delay=0.10)
@@ -305,7 +324,7 @@ class ReachingModel:
 
         Example:
             model = ReachingModel.create("my_model")
-            model = ReachingModel.create("big", module_sizes=[512, 256, 64])
+            model = ReachingModel.create("big", module_sizes=[256, 256, 128, 32])
         """
         device = th.device("cpu")
 
@@ -313,8 +332,8 @@ class ReachingModel:
         preset = MODULE_PRESET.copy()
 
         if module_sizes is not None:
-            if len(module_sizes) != 3:
-                raise ValueError(f"Expected 3 module sizes, got {len(module_sizes)}")
+            if len(module_sizes) != 4:
+                raise ValueError(f"Expected 4 module sizes, got {len(module_sizes)}")
             preset['module_sizes'] = module_sizes
 
         # User kwargs override preset values
@@ -374,7 +393,8 @@ class ReachingModel:
             connectivity_delay=np.zeros((len(config.module_sizes), len(config.module_sizes))),
             spectral_scaling=config.spectral_scaling,
             device=device,
-            activation='tanh'
+            activation=config.activation,
+            output_delay=config.output_delay,
         )
 
         model = cls(
@@ -465,7 +485,8 @@ class ReachingModel:
             connectivity_delay=np.zeros((len(config.module_sizes), len(config.module_sizes))),
             spectral_scaling=config.spectral_scaling,
             device=device,
-            activation='tanh'
+            activation=config.activation,
+            output_delay=config.output_delay,
         )
 
         # Load weights if they exist
@@ -543,8 +564,8 @@ class ReachingModel:
         n_t = int(self.config.episode_duration / self.env.effector.dt)
 
         # Loss function and keys
-        calculate_loss = lambda ep: calculate_loss_michaels(ep)
-        loss_keys = ["total", "position", "speed", "jerk", "muscle", "muscle_derivative", "hidden", "hidden_derivative"]
+        calculate_loss = lambda ep: michaels_modular_loss(ep)
+        loss_keys = ["total", "position", "jerk", "muscle", "hidden_derivative"]
 
         # Initialize loss history if needed
         if not self.training_state.loss_history:

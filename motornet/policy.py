@@ -44,6 +44,10 @@ class PolicyGRU(nn.Module):
         return hidden
 
 
+# Alias for backward compatibility
+Policy = PolicyGRU
+
+
 class ModularPolicyGRU(nn.Module):
     def __init__(self, input_size: int, module_size: list, output_size: int,
                  vision_mask: list, proprio_mask: list, task_mask: list,
@@ -76,7 +80,7 @@ class ModularPolicyGRU(nn.Module):
         self.connectivity_delay = connectivity_delay
         self.output_delay = output_delay
         self.max_connectivity_delay = np.max(connectivity_delay)
-        self.max_delay = np.max([self.max_connectivity_delay, self.output_delay]).astype(np.integer)
+        self.max_delay = int(np.max([self.max_connectivity_delay, self.output_delay]))
         self.h_buffer = []
         self.counter = 0
         self.cancel_times = None

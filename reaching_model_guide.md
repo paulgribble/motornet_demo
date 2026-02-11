@@ -10,30 +10,39 @@ The simulated arm is a 2-joint (shoulder + elbow), 6-muscle model (`RigidTendonA
 
 ## Architecture
 
-The architecture is a 3-module modular GRU inspired by the primate motor system:
+The architecture is a 4-module modular GRU inspired by the primate motor system:
 
 ```
-Task inputs ──┐
-(target, go)  │
-              ├──→ [M1] ──→ [SC] ──→ sigmoid ──→ muscle activations ──→ arm model
-Vision ───────┤     ↑                  (6 muscles)                      (2 joints)
-(hand pos)    │    [S1]
-Proprioception┘
+Task inputs ──→ [PMd] ──→ [M1] ──→ [SC] ──→ sigmoid ──→ muscle activations ──→ arm model
+(target, go)               ↑↓        ↑       (1-step     (6 muscles)            (2 joints)
+Vision ──────→ [PMd],[M1] [S1] ←─── [SC]      delay)
+(hand pos)                  │
+Proprioception ──────────→ [SC]
 (muscle state)
 ```
 
-| Module |           Name            | Size |                          Role                          |
-| ------ | ------------------------- | ---- | ------------------------------------------------------ |
-| 0      | Primary motor cortex (M1) | 256  | Motor command generation, receives vision + task goals |
-| 1      | Somatosensory cortex (S1) | 256  | Proprioceptive processing, sends corrections to M1     |
-| 2      | Spinal cord (SC)          | 64   | Alpha motor neurons + local interneuron circuits       |
+| Module | Name                          | Size | Role                                                    |
+| ------ | ----------------------------- | ---- | ------------------------------------------------------- |
+| 0      | Dorsal premotor cortex (PMd)  | 128  | Motor planning, receives task goals + vision             |
+| 1      | Primary motor cortex (M1)     | 128  | Motor command generation, receives vision + PMd commands |
+| 2      | Somatosensory cortex (S1)     | 128  | Processes ascending proprioceptive signals from SC       |
+| 3      | Spinal cord (SC)              | 16   | Alpha motor neurons, receives proprioception + M1 input  |
 
-The connectivity between modules reflects known primate neuroanatomy:
-- **M1 → SC** (0.30): Corticospinal tract. Primary descending voluntary pathway.
-- **S1 → M1** (0.25): Areas 3a/2 project to M1 for online proprioceptive correction.
-- **SC → S1** (0.15): Ascending dorsal columns (cuneate → VPLc → S1).
-- **SC → M1** (0.10): Long-loop transcortical reflex pathway.
-- Vision and task inputs reach M1; proprioception reaches S1 and SC; only SC drives muscle output (motor neurons in the ventral horn).
+The connectivity between modules reflects known primate neuroanatomy. The `connectivity_mask` is indexed as **[receiver, sender]** — row *i* specifies the probability that module *i* receives connections from each sender module (columns).
+
+Key inter-module pathways:
+- **PMd ↔ M1** (0.20): Bidirectional premotor-motor connectivity.
+- **M1 ↔ S1** (0.20): Bidirectional motor-somatosensory connectivity.
+- **M1 → SC** (0.20): Corticospinal tract. Primary descending voluntary pathway.
+- **SC → S1** (1.00): Ascending dorsal columns. Strong proprioceptive relay.
+
+Sensory routing:
+- Vision reaches PMd and M1 (dorsal stream).
+- Task inputs (target, go cue) reach PMd only.
+- Proprioception reaches SC only (direct muscle afferents).
+- Only SC drives muscle output (motor neurons in the ventral horn), with a **1-timestep output delay**.
+
+The activation function is `rect_tanh` (rectified tanh): `max(0, tanh(x))`.
 
 ## Python API
 
@@ -46,33 +55,35 @@ from reaching_model import ReachingModel
 model = ReachingModel.create("my_model")
 
 # Create with custom module sizes
-model = ReachingModel.create("big_model", module_sizes=[512, 256, 64])
+model = ReachingModel.create("big_model", module_sizes=[256, 256, 128, 32])
 ```
 
 All configurable parameters at creation time:
 
-|       Parameter        |    Default     |               Description               |
-| ---------------------- | -------------- | --------------------------------------- |
-| `module_sizes`         | [256, 256, 64] | Units per module (M1, S1, SC)           |
-| `episode_duration`     | 3.0            | Simulation duration in seconds          |
-| `proprioception_delay` | 0.02           | Proprioceptive feedback delay (seconds) |
-| `vision_delay`         | 0.08           | Visual feedback delay (seconds)         |
-| `proprioception_noise` | 1e-3           | Proprioceptive noise (std dev)          |
-| `vision_noise`         | 1e-3           | Visual noise (std dev)                  |
-| `action_noise`         | 1e-4           | Motor command noise (std dev)           |
-| `learning_rate`        | 1e-3           | Adam optimizer learning rate            |
+|       Parameter        |       Default        |               Description               |
+| ---------------------- | -------------------- | --------------------------------------- |
+| `module_sizes`         | [128, 128, 128, 16]  | Units per module (PMd, M1, S1, SC)      |
+| `episode_duration`     | 3.0                  | Simulation duration in seconds          |
+| `proprioception_delay` | 0.01                 | Proprioceptive feedback delay (seconds) |
+| `vision_delay`         | 0.11                 | Visual feedback delay (seconds)         |
+| `proprioception_noise` | 1e-3                 | Proprioceptive noise (std dev)          |
+| `vision_noise`         | 1e-3                 | Visual noise (std dev)                  |
+| `action_noise`         | 1e-4                 | Motor command noise (std dev)           |
+| `learning_rate`        | 1e-3                 | Adam optimizer learning rate            |
+| `activation`           | "rect_tanh"          | Activation function (tanh or rect_tanh) |
+| `output_delay`         | 1                    | Timesteps of delay on output layer      |
 
 Connectivity parameters (advanced):
 
-|      Parameter      |                  Default                   |                        Description                        |
-| ------------------- | ------------------------------------------ | --------------------------------------------------------- |
-| `vision_mask`       | [0.50, 0.00, 0.00]                         | Connection probability from vision to each module         |
-| `proprio_mask`      | [0.10, 0.35, 0.50]                         | Connection probability from proprioception to each module |
-| `task_mask`         | [0.50, 0.00, 0.00]                         | Connection probability from task inputs to each module    |
-| `connectivity_mask` | 3x3 matrix                                 | Inter-module connection probabilities                     |
-| `output_mask`       | [0.00, 0.00, 0.50]                         | Connection probability from each module to output         |
-| `module_names`      | ["motor", "somatosensory", "spinal"]       | Names for each module                                     |
-| `spectral_scaling`  | 1.15                                       | Spectral radius scaling for recurrent weights             |
+|      Parameter      |                       Default                        |                          Description                          |
+| ------------------- | ---------------------------------------------------- | ------------------------------------------------------------- |
+| `vision_mask`       | [1.00, 1.00, 0.00, 0.00]                             | Connection probability from vision to each module             |
+| `proprio_mask`      | [0.00, 0.00, 0.00, 1.00]                             | Connection probability from proprioception to each module     |
+| `task_mask`         | [1.00, 0.00, 0.00, 0.00]                             | Connection probability from task inputs to each module        |
+| `connectivity_mask` | 4x4 matrix (indexed as [receiver, sender])            | Inter-module connection probabilities                         |
+| `output_mask`       | [0.00, 0.00, 0.00, 1.00]                             | Connection probability from each module to output             |
+| `module_names`      | ["premotor", "motor", "somatosensory", "spinal"]     | Names for each module                                         |
+| `spectral_scaling`  | 1.15                                                  | Spectral radius scaling for recurrent weights                 |
 
 ### Training
 
@@ -183,19 +194,14 @@ The network receives at each timestep:
 
 ## Loss Function
 
-The model uses `calculate_loss_mehrdad` (based on Kashefi demo code), which includes weight decay:
+The model uses `michaels_modular_loss`, which penalizes four terms:
 
-|  Component   | Weight |      What it penalizes       |
-| ------------ | ------ | ---------------------------- |
-| pos          | 1e+0   | Position error               |
-| act          | 0      | Muscle activation (disabled) |
-| force        | 1e-4   | Muscle forces                |
-| force_diff   | 1e-4   | Force changes                |
-| hdn          | 1e-2   | Hidden activity              |
-| hdn_diff     | 1e-1   | Hidden activity changes      |
-| weight_decay | 1e-7   | L2 norm of recurrent weights |
-| speed        | 0      | Speed (disabled)             |
-| hdn_jerk     | 1e-10  | Hidden activity jerk         |
+|    Component     | Weight |                   What it penalizes                    |
+| ---------------- | ------ | ------------------------------------------------------ |
+| position         | 1e+3   | L1 hand-to-target distance (summed over x, y)         |
+| muscle           | 1e-1   | Muscle force magnitude (summed over muscles)           |
+| hidden_derivative| 1e+3   | 2nd derivative of hidden activity (spectral smoothness)|
+| jerk             | 1e+5   | 2nd derivative of velocity (movement jerk)             |
 
 ## Force Fields
 

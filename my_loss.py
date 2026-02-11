@@ -34,6 +34,17 @@ def calculate_loss_kashefi(episode_data):
                       losses['hidden']   + losses['hidden_derivative']
     return losses
 
+def michaels_modular_loss(episode_data):
+    losses = {
+        'position'         : 1e+3 * th.mean(th.sum(th.abs(episode_data['xy'][:, :, 0:2] - episode_data['targets'][:, :, :2]), dim=-1)),
+        'muscle'           : 1e-1 * th.mean(th.sum(episode_data['force'], dim=-1)),
+        'hidden_derivative': 1e+3 * th.mean(th.sum(th.square(th.diff(episode_data['hidden'], 2, dim=1)), dim=-1)),
+        'jerk'             : 1e+5 * th.mean(th.sum(th.square(th.diff(episode_data['xy'][:, :, 2:], 2, dim=1)), dim=-1)),
+    }
+    losses['total'] = losses['position'] + losses['muscle'] + losses['hidden_derivative'] + losses['jerk']
+    return losses
+
+
 def calculate_loss_mehrdad(episode_data, policy, env):
     # from Mehrdad Kashefi demo code 'modular_paul_minimal' (November 24, 2025)
     # Get recurrent weight for weight decay (GRU weight_hh_l0)
