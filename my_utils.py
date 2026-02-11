@@ -7,7 +7,7 @@ import json
 import motornet as mn
 from my_env import ExperimentEnv
 from my_task import ExperimentTask
-from my_policy import Policy
+from my_policy import PolicyGRU
 from my_policy import ModularPolicyGRU
 
 # Pre-computed curl matrices for force field (avoid recreating every timestep)

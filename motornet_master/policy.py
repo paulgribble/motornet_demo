@@ -44,6 +44,10 @@ class PolicyGRU(nn.Module):
         return hidden
 
 
+# Alias for backward compatibility
+Policy = PolicyGRU
+
+
 class ModularPolicyGRU(nn.Module):
     def __init__(self, input_size: int, module_size: list, output_size: int,
                  vision_mask: list, proprio_mask: list, task_mask: list,
@@ -78,7 +82,7 @@ class ModularPolicyGRU(nn.Module):
         self.max_connectivity_delay = np.max(connectivity_delay)
         self.max_delay = int(np.max([self.max_connectivity_delay, self.output_delay]))
         self.h_buffer = []
-        self.counter = th.tensor(0)
+        self.counter = 0
         self.cancel_times = None
         self.last_task_proprio_only = last_task_proprio_only
 
@@ -291,19 +295,17 @@ class ModularPolicyGRU(nn.Module):
         self.cancelation_matrix = th.tensor(cancelation_matrix, dtype=th.float32)
 
     def reset_counter(self):
-        self.counter = th.tensor(0)
+        self.counter = 0
 
     def set_cancel_times(self, times):
         self.cancel_times = times
 
-    @th.compile(mode='max-autotune')
     def update_buffer(self, h_buffer, h_prev):
         # Create a new tensor by concatenating h_prev (reshaped appropriately) with the older values
         # Skip the last value to maintain the buffer size
         new_h_buffer = th.cat((h_prev.unsqueeze(-1), h_buffer[:, :, :-1]), dim=-1)
         return new_h_buffer
 
-    @th.compile(mode='max-autotune')
     def forward(self, x, h_prev):
         # Update hidden state buffer
         self.h_buffer = self.update_buffer(self.h_buffer, h_prev)
@@ -338,7 +340,7 @@ class ModularPolicyGRU(nn.Module):
             h_tilda = self.activation(F.linear(concat_hidden, self.Wh, self.bh) + (th.randn(self.Wh.shape[0]) * 1e-3))
             h_new = (1 - z) * h_prev + z * h_tilda
 
-        if self.cancelation_matrix is not None and self.counter.item() in self.cancel_times:
+        if self.cancelation_matrix is not None and self.counter in self.cancel_times:
             print('cancelling')
             h_new += h_new @ self.cancelation_matrix
 

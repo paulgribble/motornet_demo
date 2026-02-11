@@ -44,10 +44,6 @@ class PolicyGRU(nn.Module):
         return hidden
 
 
-# Alias for backward compatibility
-Policy = PolicyGRU
-
-
 class ModularPolicyGRU(nn.Module):
     def __init__(self, input_size: int, module_size: list, output_size: int,
                  vision_mask: list, proprio_mask: list, task_mask: list,
@@ -80,7 +76,7 @@ class ModularPolicyGRU(nn.Module):
         self.connectivity_delay = connectivity_delay
         self.output_delay = output_delay
         self.max_connectivity_delay = np.max(connectivity_delay)
-        self.max_delay = int(np.max([self.max_connectivity_delay, self.output_delay]))
+        self.max_delay = np.max([self.max_connectivity_delay, self.output_delay]).astype(np.integer)
         self.h_buffer = []
         self.counter = 0
         self.cancel_times = None
@@ -300,12 +296,14 @@ class ModularPolicyGRU(nn.Module):
     def set_cancel_times(self, times):
         self.cancel_times = times
 
+    @th.compile(mode='max-autotune')
     def update_buffer(self, h_buffer, h_prev):
         # Create a new tensor by concatenating h_prev (reshaped appropriately) with the older values
         # Skip the last value to maintain the buffer size
         new_h_buffer = th.cat((h_prev.unsqueeze(-1), h_buffer[:, :, :-1]), dim=-1)
         return new_h_buffer
 
+    @th.compile(mode='max-autotune')
     def forward(self, x, h_prev):
         # Update hidden state buffer
         self.h_buffer = self.update_buffer(self.h_buffer, h_prev)
