@@ -201,7 +201,7 @@ class ModelConfig:
     vision_noise: float = 1e-3
     action_noise: float = 1e-4
     learning_rate: float = 1e-3
-    activation: str = 'rect_tanh'
+    activation: str = 'tanh' #'rect_tanh'
     output_delay: int = 1
 
     # Module parameters (defaults from 4-module preset)
