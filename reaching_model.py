@@ -88,7 +88,7 @@ MODULE_PRESET = dict(
     module_sizes=[256, 256, 64],
     #                          M1    S1    SC
     vision_mask=              [0.50, 0.00, 0.00],  # dorsal stream to M1
-    proprio_mask=             [0.00, 0.00, 0.50],  # Ia/Ib: SC direct, S1 via dorsal cols, M1 via VPLo
+    proprio_mask=             [0.10, 0.50, 0.20],  # Ia/Ib: SC direct, S1 via dorsal cols, M1 via VPLo
     task_mask=                [0.50, 0.00, 0.00],  # target/go: M1 primary
     connectivity_mask=[
         #                      →M1   →S1   →SC
@@ -96,7 +96,7 @@ MODULE_PRESET = dict(
         [                      0.70, 0.05, 0.30],
         # from S1:             online self  weak
         #                      corr.
-        [                      0.25, 0.70, 0.05],
+        [                      0.25, 0.70, 0.15],
         # from SC:             long  asc.  self
         #                      loop  dorsal (interneurons)
         #                            cols
