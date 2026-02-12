@@ -18,6 +18,6 @@ model = ReachingModel.create(
 )
 
 model.train(n_batches=10000, batch_size=32)
-model.train(n_batches=500, batch_size=32, task_mode='center_out')
+model.train(n_batches=500, batch_size=8, task_mode='center_out')
 model.test(n_targets=8)
 model.save()

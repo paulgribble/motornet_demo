@@ -1,28 +1,23 @@
 """
 Reaching Model - A simplified interface for training modular RNNs to control a biomechanical arm.
 
-The architecture is a 4-module modular GRU inspired by the primate motor system:
-  PMd (premotor) → M1 (motor cortex) → SC (spinal cord)
-                   ↑↓
-                   S1 (somatosensory) ← SC
+The default architecture is a 2-module modular GRU (M1 + SC):
+  M1 (motor cortex) → SC (spinal cord)
 
-PMd receives task inputs (target, go cue) and vision, and projects to M1.
-M1 receives vision and generates descending commands to SC. S1 receives
-ascending proprioceptive signals from SC and projects corrections to M1.
-Output is from SC only, with a 1-timestep delay.
+M1 receives task inputs (target, go cue) and vision, and generates descending
+commands to SC. SC receives proprioceptive signals and descending commands from
+M1, and drives muscle output with a 1-timestep delay.
 
-Example usage (API):
+Larger architectures (3-module, 4-module) can be configured via parameters.
+See go_3module.py and go_4module.py for examples.
+
+Example usage:
     from reaching_model import ReachingModel
 
     model = ReachingModel.create("my_model")
     model.train(n_batches=10000, batch_size=64)
     model.test(n_targets=8)
     model.save()
-
-Example usage (CLI):
-    uv run reaching_model.py create my_model
-    uv run reaching_model.py train my_model --batches 10000
-    uv run reaching_model.py test my_model --targets 8
 """
 
 from __future__ import annotations
@@ -31,7 +26,6 @@ import os
 import sys
 import json
 import pickle
-import argparse
 from dataclasses import dataclass, field, asdict
 from typing import Optional, Literal
 
@@ -60,140 +54,14 @@ from my_utils import run_episode, plot_losses, plot_handpaths, plot_signals
 
 
 # =============================================================================
-# 4-Module Architecture: PMd, M1, S1, SC
-# =============================================================================
-#
-# Anatomically-motivated connectivity for a modular recurrent network
-# controlling a 2-joint, 6-muscle arm model.
-#
-# Mask values are CONNECTION PROBABILITIES: during initialization, each
-# potential synapse is included with this probability, creating structured
-# sparsity that reflects known projection density in the primate motor system.
-#
-# NOTE: The connectivity_mask is indexed as [receiver, sender]. Row i
-# specifies the probability that module i RECEIVES connections from each
-# other module (columns).
-#
-# Modules:
-#   [0] PMd — Dorsal premotor cortex (128 units): receives task inputs
-#             (target, go cue) and vision; motor planning
-#   [1] M1  — Primary motor cortex (128 units): receives vision and
-#             descending commands from PMd; generates motor output
-#   [2] S1  — Somatosensory cortex (128 units): processes ascending
-#             proprioceptive signals from SC; projects corrections to M1
-#   [3] SC  — Spinal cord (16 units): receives proprioception and
-#             descending commands from M1; drives muscle output
-#
-# Key inter-module pathways (sender → receiver):
-#   PMd ↔ M1  (0.20): Bidirectional premotor-motor connectivity
-#   M1  ↔ S1  (0.20): Bidirectional motor-somatosensory connectivity
-#   M1  → SC  (0.20): Corticospinal tract. Primary descending pathway.
-#   SC  → S1  (1.00): Ascending dorsal columns (strong proprioceptive relay)
-
-MODULE_PRESET = dict(
-    module_names=["premotor", "motor", "somatosensory", "spinal"],
-    module_sizes=[128, 128, 128, 32],
-    #                          PMd   M1    S1    SC
-    vision_mask=              [1.00, 1.00, 0.00, 0.00],  # dorsal stream to PMd and M1
-    proprio_mask=             [0.00, 0.00, 0.00, 1.00],  # proprioception to SC only
-    task_mask=                [1.00, 0.00, 0.00, 0.00],  # target/go cue to PMd only
-    connectivity_mask=[
-        # receiver ←          PMd   M1    S1    SC     (columns = sender)
-        # PMd receives:       self  from M1
-        [                      1.00, 0.20, 0.00, 0.00],
-        # M1 receives:        from  self  from
-        #                     PMd         S1
-        [                      0.20, 1.00, 0.20, 0.00],
-        # S1 receives:              from  self  from SC
-        #                           M1          (ascending)
-        [                      0.00, 0.20, 1.00, 1.00],
-        # SC receives:              from        self
-        #                           M1 (CST)
-        [                      0.00, 0.20, 0.00, 1.00],
-    ],
-    output_mask=              [0.00, 0.00, 0.00, 1.00],  # alpha motor neurons in SC only
-    spectral_scaling=1.30,
-    output_delay=1,
-)
-
-
-def print_architecture():
-    """Print a readable summary of the module architecture."""
-    names = MODULE_PRESET['module_names']
-    sizes = MODULE_PRESET['module_sizes']
-    n_mod = len(names)
-    conn = np.array(MODULE_PRESET['connectivity_mask'])
-
-    print("=" * 70)
-    print(f"{n_mod}-MODULE ARCHITECTURE: {', '.join(n.upper() for n in names)}")
-    print("=" * 70)
-
-    print("\nModules:")
-    for i, (name, size) in enumerate(zip(names, sizes)):
-        print(f"  [{i}] {name:15s}  {size:4d} units")
-    print(f"  {'Total':>20s}: {sum(sizes):4d} units")
-
-    print("\nInput masks (connection probability):")
-    header = "".join(f"{n:>12s}" for n in names)
-    print(f"  {'':15s}{header}")
-    for label, mask in [("Vision", MODULE_PRESET['vision_mask']),
-                        ("Proprioception", MODULE_PRESET['proprio_mask']),
-                        ("Task (tgt, go)", MODULE_PRESET['task_mask'])]:
-        vals = "".join(f"{v:12.2f}" for v in mask)
-        print(f"  {label:15s}{vals}")
-
-    print(f"\nConnectivity (rows=receiver, cols=sender):")
-    header = "".join(f"{'←'+n:>12s}" for n in names)
-    print(f"  {'':15s}{header}")
-    for i, name in enumerate(names):
-        row = conn[i]
-        vals = "".join(f"{v:12.2f}" for v in row)
-        marks = []
-        for j in range(n_mod):
-            if i == j:
-                marks.append("self")
-            elif row[j] >= 0.25:
-                marks.append("★")
-            elif row[j] >= 0.10:
-                marks.append("●")
-            elif row[j] >= 0.05:
-                marks.append("○")
-            else:
-                marks.append("·")
-        print(f"  {name:15s}{vals}   {' '.join(marks)}")
-    print(f"  {'Legend:':>15s} ★ ≥.25  ● ≥.10  ○ ≥.05  · <.05")
-
-    print(f"\nOutput mask:")
-    header = "".join(f"{n:>12s}" for n in names)
-    print(f"  {'':15s}{header}")
-    vals = "".join(f"{v:12.2f}" for v in MODULE_PRESET['output_mask'])
-    print(f"  {'-> muscles':15s}{vals}")
-
-    pathways = []
-    for i in range(n_mod):
-        for j in range(n_mod):
-            if i != j and conn[i][j] >= 0.05:
-                # conn[i][j] = module i receives from module j
-                pathways.append((names[j], names[i], conn[i][j]))
-    pathways.sort(key=lambda x: -x[2])
-
-    print(f"\nKey inter-module pathways (sorted by strength):")
-    for src, tgt, prob in pathways:
-        print(f"  {src} -> {tgt:15s} p={prob:.2f}")
-
-    print("=" * 70)
-    print()
-
-
-# =============================================================================
 # Configuration Classes
 # =============================================================================
 
 @dataclass
 class ModelConfig:
-    """Configuration for a modular reaching model (PMd, M1, S1, SC)."""
+    """Configuration for a modular reaching model."""
     name: str
-    n_modules: int = 4
+    n_modules: int = 2
     episode_duration: float = 3.0
     proprioception_delay: float = 0.01
     vision_delay: float = 0.11
@@ -204,19 +72,17 @@ class ModelConfig:
     activation: str = 'tanh' #'rect_tanh'
     output_delay: int = 1
 
-    # Module parameters (defaults from 4-module preset)
-    module_names: list = field(default_factory=lambda: ["premotor", "motor", "somatosensory", "spinal"])
-    module_sizes: list = field(default_factory=lambda: [128, 128, 128, 32])
-    vision_mask: list = field(default_factory=lambda:  [1.00, 1.00, 0.00, 0.00])
-    proprio_mask: list = field(default_factory=lambda: [0.00, 0.00, 0.00, 1.00])
-    task_mask: list = field(default_factory=lambda:    [1.00, 0.00, 0.00, 0.00])
+    # Module parameters (defaults for 2-module: M1 + SC)
+    module_names: list = field(default_factory=lambda: ["motor", "spinal"])
+    module_sizes: list = field(default_factory=lambda: [128, 32])
+    vision_mask: list = field(default_factory=lambda:  [1.0, 0.0])
+    proprio_mask: list = field(default_factory=lambda: [0.0, 1.0])
+    task_mask: list = field(default_factory=lambda:    [1.0, 0.0])
     connectivity_mask: list = field(default_factory=lambda: [
-        [1.00, 0.20, 0.00, 0.00],
-        [0.20, 1.00, 0.20, 0.00],
-        [0.00, 0.20, 1.00, 1.00],
-        [0.00, 0.20, 0.00, 1.00],
+        [0.7, 0.1],
+        [0.5, 0.7],
     ])
-    output_mask: list = field(default_factory=lambda: [0.00, 0.00, 0.00, 1.00])
+    output_mask: list = field(default_factory=lambda: [0.0, 1.0])
     spectral_scaling: float = 1.30
 
     def to_dict(self) -> dict:
@@ -225,17 +91,9 @@ class ModelConfig:
     @classmethod
     def from_dict(cls, d: dict) -> "ModelConfig":
         d = d.copy()
-        # Strip legacy fields that are no longer part of the dataclass
-        d.pop('modular', None)
-        d.pop('n_units', None)
         # Infer n_modules from module_sizes if missing
         if 'n_modules' not in d:
-            d['n_modules'] = len(d.get('module_sizes', [128, 128, 128, 16]))
-        # Default new fields for legacy configs
-        if 'activation' not in d:
-            d['activation'] = 'rect_tanh'
-        if 'output_delay' not in d:
-            d['output_delay'] = 1
+            d['n_modules'] = len(d.get('module_sizes', [128, 32]))
         return cls(**d)
 
 
@@ -265,8 +123,8 @@ class TrainingState:
 
 class ReachingModel:
     """
-    A 4-module neural network model that learns to control a simulated arm
-    for reaching tasks (PMd, M1, S1, SC).
+    A modular neural network model that learns to control a simulated arm
+    for reaching tasks. Default architecture: M1 + SC (2-module).
 
     Attributes:
         name: The model's name (also used for the save directory)
@@ -300,58 +158,12 @@ class ReachingModel:
     # Factory Methods
     # -------------------------------------------------------------------------
 
-    @classmethod
-    def create(
-        cls,
-        name: str,
-        module_sizes: Optional[list] = None,
-        episode_duration: float = 3.0,
-        save: bool = True,
-        **kwargs
-    ) -> "ReachingModel":
-        """
-        Create a new 4-module reaching model (PMd, M1, S1, SC).
-
-        Args:
-            name: Name for the model (will create a directory with this name)
-            module_sizes: Override default module sizes [128, 128, 128, 16]
-            episode_duration: Duration of each simulation episode in seconds
-            save: If True, save the model after creation
-            **kwargs: Override any config parameter (e.g. vision_delay=0.10)
-
-        Returns:
-            A new ReachingModel instance
-
-        Example:
-            model = ReachingModel.create("my_model")
-            model = ReachingModel.create("big", module_sizes=[256, 256, 128, 32])
-        """
-        device = th.device("cpu")
-
-        # Build configuration from preset + overrides
-        preset = MODULE_PRESET.copy()
-
-        if module_sizes is not None:
-            preset['module_sizes'] = module_sizes
-
-        # User kwargs override preset values
-        for key in list(kwargs.keys()):
-            if key in preset:
-                preset[key] = kwargs.pop(key)
-
-        config = ModelConfig(
-            name=name,
-            episode_duration=episode_duration,
-            **preset,
-            **kwargs
-        )
-
-        # Create the biomechanical arm model
+    @staticmethod
+    def _build_components(config):
+        """Create env, task, and policy from a ModelConfig."""
         effector = mn.effector.RigidTendonArm26(
             muscle=mn.muscle.RigidTendonHillMuscle()
         )
-
-        # Create the environment
         env = ExperimentEnv(
             effector=effector,
             max_ep_duration=config.episode_duration,
@@ -361,17 +173,13 @@ class ReachingModel:
             vision_noise=config.vision_noise,
             action_noise=config.action_noise
         )
-
-        # Create the task
         task = ExperimentTask(effector=env.effector)
 
-        # Get input dimensions by generating a sample
         n_t = int(config.episode_duration / env.effector.dt)
         inputs, _, _, _, _ = task.generate(1, n_t)
         n_task_inputs = inputs['inputs'].shape[2]
         total_input_size = env.observation_space.shape[0] + n_task_inputs
 
-        # Calculate input dimension indices for the modular network
         task_dim = np.arange(inputs['inputs'].shape[-1])
         vision_dim = np.arange(env.get_vision().shape[1]) + task_dim[-1] + 1
         proprio_dim = np.arange(env.get_proprioception().shape[1]) + vision_dim[-1] + 1
@@ -390,10 +198,43 @@ class ReachingModel:
             output_mask=config.output_mask,
             connectivity_delay=np.zeros((len(config.module_sizes), len(config.module_sizes))),
             spectral_scaling=config.spectral_scaling,
-            device=device,
+            device=th.device("cpu"),
             activation=config.activation,
             output_delay=config.output_delay,
         )
+        return env, task, policy
+
+    @classmethod
+    def create(
+        cls,
+        name: str,
+        episode_duration: float = 3.0,
+        save: bool = True,
+        **kwargs
+    ) -> "ReachingModel":
+        """
+        Create a new reaching model.
+
+        Args:
+            name: Name for the model (will create a directory with this name)
+            episode_duration: Duration of each simulation episode in seconds
+            save: If True, save the model after creation
+            **kwargs: Override any ModelConfig parameter (e.g. module_sizes, vision_mask)
+
+        Returns:
+            A new ReachingModel instance
+
+        Example:
+            model = ReachingModel.create("my_model")
+            model = ReachingModel.create("big", module_sizes=[256, 256, 128, 32])
+        """
+        config = ModelConfig(
+            name=name,
+            episode_duration=episode_duration,
+            **kwargs
+        )
+
+        env, task, policy = cls._build_components(config)
 
         model = cls(
             name=name,
@@ -401,7 +242,7 @@ class ReachingModel:
             env=env,
             task=task,
             policy=policy,
-            device=device
+            device=th.device("cpu")
         )
 
         if save:
@@ -438,54 +279,7 @@ class ReachingModel:
 
         config = ModelConfig.from_dict(config_dict)
 
-        device = th.device("cpu")
-
-        # Recreate environment
-        effector = mn.effector.RigidTendonArm26(
-            muscle=mn.muscle.RigidTendonHillMuscle()
-        )
-        env = ExperimentEnv(
-            effector=effector,
-            max_ep_duration=config.episode_duration,
-            proprioception_delay=config.proprioception_delay,
-            vision_delay=config.vision_delay,
-            proprioception_noise=config.proprioception_noise,
-            vision_noise=config.vision_noise,
-            action_noise=config.action_noise
-        )
-
-        # Recreate task
-        task = ExperimentTask(effector=env.effector)
-
-        # Get input dimensions
-        n_t = int(config.episode_duration / env.effector.dt)
-        inputs, _, _, _, _ = task.generate(1, n_t)
-        n_task_inputs = inputs['inputs'].shape[2]
-        total_input_size = env.observation_space.shape[0] + n_task_inputs
-
-        # Recreate policy
-        task_dim = np.arange(inputs['inputs'].shape[-1])
-        vision_dim = np.arange(env.get_vision().shape[1]) + task_dim[-1] + 1
-        proprio_dim = np.arange(env.get_proprioception().shape[1]) + vision_dim[-1] + 1
-
-        policy = ModularPolicyGRU(
-            input_size=total_input_size,
-            module_size=config.module_sizes,
-            output_size=env.n_muscles,
-            vision_dim=vision_dim,
-            proprio_dim=proprio_dim,
-            task_dim=task_dim,
-            vision_mask=config.vision_mask,
-            proprio_mask=config.proprio_mask,
-            task_mask=config.task_mask,
-            connectivity_mask=np.array(config.connectivity_mask),
-            output_mask=config.output_mask,
-            connectivity_delay=np.zeros((len(config.module_sizes), len(config.module_sizes))),
-            spectral_scaling=config.spectral_scaling,
-            device=device,
-            activation=config.activation,
-            output_delay=config.output_delay,
-        )
+        env, task, policy = cls._build_components(config)
 
         # Load weights if they exist
         if os.path.exists(weights_file):
@@ -505,7 +299,7 @@ class ReachingModel:
             task=task,
             policy=policy,
             training_state=training_state,
-            device=device
+            device=th.device("cpu")
         )
 
         print(f"Loaded model '{name}' (batches trained: {training_state.batches_completed})")
@@ -759,103 +553,3 @@ class ReachingModel:
 
     def __repr__(self) -> str:
         return self.summary()
-
-
-# =============================================================================
-# Command Line Interface
-# =============================================================================
-
-def main():
-    """Command-line interface for ReachingModel."""
-    parser = argparse.ArgumentParser(
-        description="Train and test 3-module neural networks for arm reaching movements.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  %(prog)s create my_model
-  %(prog)s train my_model --batches 10000
-  %(prog)s test my_model --targets 8 --ff 15.0
-  %(prog)s info my_model
-  %(prog)s arch
-        """
-    )
-
-    subparsers = parser.add_subparsers(dest="command", help="Available commands")
-
-    # CREATE command
-    create_parser = subparsers.add_parser("create", help="Create a new model")
-    create_parser.add_argument("name", help="Name for the model")
-
-    # TRAIN command
-    train_parser = subparsers.add_parser("train", help="Train an existing model")
-    train_parser.add_argument("name", help="Name of the model to train")
-    train_parser.add_argument("--batches", type=int, default=10000, help="Number of training batches (default: 10000)")
-    train_parser.add_argument("--batch-size", type=int, default=64, help="Batch size (default: 64)")
-    train_parser.add_argument("--ff", type=float, default=0.0, help="Force field strength (default: 0.0)")
-    train_parser.add_argument("--task", choices=["random", "center_out"], default="random",
-                              help="Training task type (default: random)")
-    train_parser.add_argument("--targets", type=int, default=8,
-                              help="Number of targets for center_out training (default: 8)")
-    train_parser.add_argument("--position", type=int, default=None,
-                              help="tqdm bar position (for parallel runs)")
-
-    # TEST command
-    test_parser = subparsers.add_parser("test", help="Test a trained model")
-    test_parser.add_argument("name", help="Name of the model to test")
-    test_parser.add_argument("--targets", type=int, default=8, help="Number of targets (default: 8)")
-    test_parser.add_argument("--ff", type=float, default=0.0, help="Force field strength (default: 0.0)")
-
-    # INFO command
-    info_parser = subparsers.add_parser("info", help="Show model information")
-    info_parser.add_argument("name", help="Name of the model")
-
-    # SAVE command (rename/copy)
-    save_parser = subparsers.add_parser("save", help="Save model with a new name")
-    save_parser.add_argument("name", help="Current model name")
-    save_parser.add_argument("new_name", help="New name for the model")
-
-    # ARCH command — show architecture details
-    arch_parser = subparsers.add_parser("arch", help="Show architecture details")
-
-    args = parser.parse_args()
-
-    if args.command is None:
-        parser.print_help()
-        sys.exit(1)
-
-    # Execute command
-    if args.command == "create":
-        ReachingModel.create(name=args.name)
-
-    elif args.command == "train":
-        model = ReachingModel.load(args.name)
-        batch_size = args.targets if args.task == "center_out" else args.batch_size
-        model.train(
-            n_batches=args.batches,
-            batch_size=batch_size,
-            ff_strength=args.ff,
-            task_mode=args.task,
-            tqdm_position=args.position,
-        )
-
-    elif args.command == "test":
-        model = ReachingModel.load(args.name)
-        model.test(
-            n_targets=args.targets,
-            ff_strength=args.ff,
-        )
-
-    elif args.command == "info":
-        model = ReachingModel.load(args.name)
-        print(model.summary())
-
-    elif args.command == "save":
-        model = ReachingModel.load(args.name)
-        model.save(args.new_name)
-
-    elif args.command == "arch":
-        print_architecture()
-
-
-if __name__ == "__main__":
-    main()
