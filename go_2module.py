@@ -17,6 +17,7 @@ model = ReachingModel.create(
     output_mask =   [0.0, 1.0],
 )
 
-model.train(n_batches=1000, batch_size=32)
+model.train(n_batches=10000, batch_size=32)
+model.train(n_batches=500, batch_size=32, task_mode='center_out')
 model.test(n_targets=8)
 model.save()
