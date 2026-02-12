@@ -112,7 +112,7 @@ MODULE_PRESET = dict(
         [                      0.00, 0.20, 0.00, 1.00],
     ],
     output_mask=              [0.00, 0.00, 0.00, 1.00],  # alpha motor neurons in SC only
-    spectral_scaling=1.10,
+    spectral_scaling=1.30,
     output_delay=1,
 )
 
@@ -217,7 +217,7 @@ class ModelConfig:
         [0.00, 0.20, 0.00, 1.00],
     ])
     output_mask: list = field(default_factory=lambda: [0.00, 0.00, 0.00, 1.00])
-    spectral_scaling: float = 1.10
+    spectral_scaling: float = 1.30
 
     def to_dict(self) -> dict:
         return asdict(self)

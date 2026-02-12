@@ -83,7 +83,7 @@ Connectivity parameters (advanced):
 | `connectivity_mask` | 4x4 matrix (indexed as [receiver, sender])            | Inter-module connection probabilities                         |
 | `output_mask`       | [0.00, 0.00, 0.00, 1.00]                             | Connection probability from each module to output             |
 | `module_names`      | ["premotor", "motor", "somatosensory", "spinal"]     | Names for each module                                         |
-| `spectral_scaling`  | 1.15                                                  | Spectral radius scaling for recurrent weights                 |
+| `spectral_scaling`  | 1.30                                                  | Spectral radius scaling for recurrent weights                 |
 
 ### Training
 
