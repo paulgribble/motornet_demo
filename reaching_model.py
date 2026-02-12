@@ -8,8 +8,8 @@ M1 receives task inputs (target, go cue) and vision, and generates descending
 commands to SC. SC receives proprioceptive signals and descending commands from
 M1, and drives muscle output with a 1-timestep delay.
 
-Larger architectures (3-module, 4-module) can be configured via parameters.
-See go_3module.py and go_4module.py for examples.
+Larger architectures (3-module, 4-module) or smaller (1-module) can be configured via parameters.
+See go_1module.py, go_3module.py, and go_4module.py for examples.
 
 Example usage:
     from reaching_model import ReachingModel
@@ -79,8 +79,8 @@ class ModelConfig:
     proprio_mask: list = field(default_factory=lambda: [0.0, 1.0])
     task_mask: list = field(default_factory=lambda:    [1.0, 0.0])
     connectivity_mask: list = field(default_factory=lambda: [
-        [0.7, 0.1],
-        [0.5, 0.7],
+        [0.7, 0.1], # motor receives from itself (0.7) and spinal (0.1)
+        [0.5, 0.7], # spinal receives from motor (0.5) and itself (0.7)
     ])
     output_mask: list = field(default_factory=lambda: [0.0, 1.0])
     spectral_scaling: float = 1.30
