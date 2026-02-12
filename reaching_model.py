@@ -332,8 +332,6 @@ class ReachingModel:
         preset = MODULE_PRESET.copy()
 
         if module_sizes is not None:
-            if len(module_sizes) != 4:
-                raise ValueError(f"Expected 4 module sizes, got {len(module_sizes)}")
             preset['module_sizes'] = module_sizes
 
         # User kwargs override preset values
