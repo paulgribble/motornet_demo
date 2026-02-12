@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Train 10 modular reaching models in parallel with live tqdm progress bars.
+# Train multiple modular reaching models in parallel with live tqdm progress bars.
 # Usage: ./go_modular_parallel.sh
 #
 # Ctrl-C cleanly kills all jobs.
 
-N=10
+N=8
 
 trap 'kill 0; exit 1' INT
 
