@@ -10,7 +10,7 @@ N=8
 trap 'kill 0; exit 1' INT
 
 # Phase 1: Create all models (fast, do it sequentially to keep output clean)
-for i in $(seq 1 $N); do
+for i in $(seq 0 $((N - 1))); do
   NAME=$(printf "demo_modular_%02d" $i)
   uv run python reaching_model.py create "$NAME" &
 done
@@ -18,15 +18,15 @@ done
 wait
 
 # precompile
-uv run python reaching_model.py train demo_modular_01 --batches 1
+uv run python reaching_model.py train demo_modular_00 --batches 1
 
 # Phase 2: Train in parallel with tqdm position bars
 #printf '\n%.0s' $(seq 1 $N)
 printf '\n%.0s'
 
-for i in $(seq 1 $N); do
+for i in $(seq 0 $((N - 1))); do
   NAME=$(printf "demo_modular_%02d" $i)
-  POS=$((i - 1))
+  POS=$i
   (
     uv run python reaching_model.py train "$NAME" --batches 20000 --batch-size 32 --position $POS 2>&2 >>"${NAME}.log"
     uv run python reaching_model.py train "$NAME" --batches 1000 --task center_out --position $POS 2>&2 >>"${NAME}.log"
@@ -37,7 +37,7 @@ wait
 
 # Phase 3: Test all models (fast, sequential is fine)
 echo ""
-for i in $(seq 1 $N); do
+for i in $(seq 0 $((N - 1))); do
   NAME=$(printf "demo_modular_%02d" $i)
   uv run python reaching_model.py test "$NAME" &
 done
