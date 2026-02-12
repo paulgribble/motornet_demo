@@ -22,6 +22,7 @@ uv run python reaching_model.py train demo_modular_01 --batches 1
 
 # Phase 2: Train in parallel with tqdm position bars
 #printf '\n%.0s' $(seq 1 $N)
+printf '\n%.0s'
 
 for i in $(seq 1 $N); do
   NAME=$(printf "demo_modular_%02d" $i)
