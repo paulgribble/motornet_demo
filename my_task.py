@@ -33,7 +33,7 @@ DEFAULT_DELAY_TARGET = (0.3, 0.8)  # when target appears
 DEFAULT_DELAY_GO = (0.8, 1.3)      # when go cue appears
 
 # Training parameters
-DEFAULT_CATCH_TRIAL_PROBABILITY = 0.5
+DEFAULT_CATCH_TRIAL_PROBABILITY = 0.25
 DEFAULT_INPUT_NOISE_STD = 1e-3
 
 # Safety limit for random target search
