@@ -92,7 +92,7 @@ from my_utils import run_episode, plot_losses, plot_handpaths, plot_signals
 
 MODULE_PRESET = dict(
     module_names=["premotor", "motor", "somatosensory", "spinal"],
-    module_sizes=[128, 128, 128, 16],
+    module_sizes=[128, 128, 128, 32],
     #                          PMd   M1    S1    SC
     vision_mask=              [1.00, 1.00, 0.00, 0.00],  # dorsal stream to PMd and M1
     proprio_mask=             [0.00, 0.00, 0.00, 1.00],  # proprioception to SC only
@@ -112,7 +112,7 @@ MODULE_PRESET = dict(
         [                      0.00, 0.20, 0.00, 1.00],
     ],
     output_mask=              [0.00, 0.00, 0.00, 1.00],  # alpha motor neurons in SC only
-    spectral_scaling=1.15,
+    spectral_scaling=1.10,
     output_delay=1,
 )
 
@@ -206,7 +206,7 @@ class ModelConfig:
 
     # Module parameters (defaults from 4-module preset)
     module_names: list = field(default_factory=lambda: ["premotor", "motor", "somatosensory", "spinal"])
-    module_sizes: list = field(default_factory=lambda: [128, 128, 128, 16])
+    module_sizes: list = field(default_factory=lambda: [128, 128, 128, 32])
     vision_mask: list = field(default_factory=lambda:  [1.00, 1.00, 0.00, 0.00])
     proprio_mask: list = field(default_factory=lambda: [0.00, 0.00, 0.00, 1.00])
     task_mask: list = field(default_factory=lambda:    [1.00, 0.00, 0.00, 0.00])
@@ -217,7 +217,7 @@ class ModelConfig:
         [0.00, 0.20, 0.00, 1.00],
     ])
     output_mask: list = field(default_factory=lambda: [0.00, 0.00, 0.00, 1.00])
-    spectral_scaling: float = 1.15
+    spectral_scaling: float = 1.10
 
     def to_dict(self) -> dict:
         return asdict(self)

@@ -7,5 +7,5 @@ fi
 
 uv run python reaching_model.py create "$1"
 uv run python reaching_model.py train "$1" --batches 20000 --batch-size 32
-uv run python reaching_model.py train "$1" --batches 500 --task center_out
+uv run python reaching_model.py train "$1" --batches 1000 --task center_out
 uv run python reaching_model.py test "$1"
