@@ -209,7 +209,6 @@ class ReachingModel:
         cls,
         name: str,
         episode_duration: float = 3.0,
-        save: bool = True,
         **kwargs
     ) -> "ReachingModel":
         """
@@ -218,7 +217,6 @@ class ReachingModel:
         Args:
             name: Name for the model (will create a directory with this name)
             episode_duration: Duration of each simulation episode in seconds
-            save: If True, save the model after creation
             **kwargs: Override any ModelConfig parameter (e.g. module_sizes, vision_mask)
 
         Returns:
@@ -245,9 +243,8 @@ class ReachingModel:
             device=th.device("cpu")
         )
 
-        if save:
-            model.save()
-            print(f"Created and saved model '{name}'")
+        model.save()
+        print(f"Created and saved model '{name}'")
 
         return model
 
@@ -317,7 +314,6 @@ class ReachingModel:
         task_mode: Literal["random", "center_out"] = "random",
         plot_interval: int = 100,
         quiet: bool = False,
-        tqdm_position: int = None,
     ) -> dict:
         """
         Train the model on reaching movements.
@@ -367,8 +363,7 @@ class ReachingModel:
         # Training loop
         iterator = range(n_batches)
         if not quiet:
-            iterator = tqdm(iterator, desc=f"Training '{self.name}'", unit="batch",
-                            position=tqdm_position, leave=True)
+            iterator = tqdm(iterator, desc=f"Training '{self.name}'", unit="batch")
 
         for i in iterator:
             # Run episode
@@ -409,7 +404,6 @@ class ReachingModel:
         self,
         n_targets: int = 8,
         ff_strength: float = 0.0,
-        simulation_time: float = None,
         save_plots: bool = True,
         save_data: bool = True
     ) -> dict:
@@ -419,7 +413,6 @@ class ReachingModel:
         Args:
             n_targets: Number of targets arranged in a circle
             ff_strength: Force field strength (0 = no force field)
-            simulation_time: Duration of simulation (default: episode_duration)
             save_plots: If True, save plots to the model directory
             save_data: If True, save episode data to disk
 
@@ -432,10 +425,7 @@ class ReachingModel:
         """
         os.makedirs(self.name, exist_ok=True)
 
-        if simulation_time is None:
-            simulation_time = self.config.episode_duration
-
-        n_t = int(simulation_time / self.env.dt)
+        n_t = int(self.config.episode_duration / self.env.dt)
         self.task.run_mode = 'test_center_out'
 
         print(f"Testing '{self.name}' on center-out task ({n_targets} targets, FF={ff_strength})")
@@ -480,21 +470,13 @@ class ReachingModel:
 
         return episode_data
 
-    def save(self, name: str = None, quiet: bool = False) -> None:
+    def save(self, quiet: bool = False) -> None:
         """
         Save the model to disk.
 
-        Args:
-            name: Optional new name for the model. If not provided, uses current name.
-
         Example:
             model.save()
-            model.save("my_model_backup")
         """
-        if name is not None:
-            self.name = name
-            self.config.name = name
-
         model_dir = self.name
         os.makedirs(model_dir, exist_ok=True)
 
