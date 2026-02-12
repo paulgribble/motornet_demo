@@ -524,7 +524,8 @@ class ReachingModel:
         ff_strength: float = 0.0,
         task_mode: Literal["random", "center_out"] = "random",
         plot_interval: int = 100,
-        quiet: bool = False
+        quiet: bool = False,
+        tqdm_position: int = None,
     ) -> dict:
         """
         Train the model on reaching movements.
@@ -574,7 +575,8 @@ class ReachingModel:
         # Training loop
         iterator = range(n_batches)
         if not quiet:
-            iterator = tqdm(iterator, desc=f"Training '{self.name}'", unit="batch")
+            iterator = tqdm(iterator, desc=f"Training '{self.name}'", unit="batch",
+                            position=tqdm_position, leave=True)
 
         for i in iterator:
             # Run episode
@@ -796,6 +798,8 @@ Examples:
                               help="Training task type (default: random)")
     train_parser.add_argument("--targets", type=int, default=8,
                               help="Number of targets for center_out training (default: 8)")
+    train_parser.add_argument("--position", type=int, default=None,
+                              help="tqdm bar position (for parallel runs)")
 
     # TEST command
     test_parser = subparsers.add_parser("test", help="Test a trained model")
@@ -833,6 +837,7 @@ Examples:
             batch_size=batch_size,
             ff_strength=args.ff,
             task_mode=args.task,
+            tqdm_position=args.position,
         )
 
     elif args.command == "test":
