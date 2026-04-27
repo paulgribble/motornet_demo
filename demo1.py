@@ -1,14 +1,6 @@
 import os
-os.environ['OMP_NUM_THREADS'] = '1'
-os.environ['MKL_NUM_THREADS'] = '1' # Set this too just in case
-os.environ["VECLIB_MAXIMUM_THREADS"] = '1'
-
 import torch as th
-th.set_num_threads(1)                       # intra-op
-th.set_num_interop_threads(1)               # inter-op
-
 import numpy as np
-import matplotlib.pyplot as plt
 import motornet as mn
 from tqdm import tqdm
 import pickle
@@ -23,6 +15,12 @@ from my_utils  import plot_handpaths # for plotting hand paths
 from my_utils  import plot_signals   # for plotting inputs and outputs per trial
 from my_utils  import save_model     # for saving model config, weights, losses to disk
 from my_utils  import load_model     # for loading model config and weights from disk
+
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1' # Set this too just in case
+os.environ["VECLIB_MAXIMUM_THREADS"] = '1'
+th.set_num_threads(1)                       # intra-op
+th.set_num_interop_threads(1)               # inter-op
 
 print('All packages imported.')
 print('pytorch version: ' + th.__version__)
@@ -93,7 +91,7 @@ loss_keys = ["total", "position", "speed", "jerk",
              "muscle", "muscle_derivative", "hidden", "hidden_derivative"]
 
 # main training loop
-print(f"main training loop")
+print("main training loop")
 print(f"simulating {ep_dur} second movements using {n_t} time points")
 
 for i in tqdm(
