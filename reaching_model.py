@@ -58,7 +58,9 @@ class ModelConfig:
     vision_noise: float = 1e-3
     action_noise: float = 1e-4
     learning_rate: float = 1e-3
-    activation: str = 'rect_tanh' # 'tanh' or 'rect_tanh'
+    # 'tanh' (-1 to 1) or 'rect_tanh' = max(0, tanh), which keeps hidden activity
+    # in 0 to 1 so units behave like firing rates (never negative)
+    activation: str = 'rect_tanh'
     output_delay: int = 1         # timesteps
 
     # One entry per module. The masks give the probability of a connection:
