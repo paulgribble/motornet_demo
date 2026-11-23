@@ -34,6 +34,25 @@ After you setup as above, you can run the `demo1.py` script like this:
 uv run python demo1.py
 ```
 
+## Code layout
+
+| file | what it is |
+|---|---|
+| `demo1.py` | start here: trains a plain GRU step by step, then tests it |
+| `go_1module.py` ... `go_4module.py` | train modular networks (1 to 4 "brain areas") |
+| `reaching_model.py` | `ReachingModel`: create / train / test / save / load a modular network |
+| `my_env.py` | the environment: what the network senses |
+| `my_task.py` | the task: what trials look like (targets, go cue, catch trials) |
+| `my_policy.py` | the networks: `PolicyGRU` and `ModularPolicyGRU` |
+| `my_loss.py` | the loss functions |
+| `my_utils.py` | `run_episode` (simulate a batch of trials), saving and loading |
+| `my_plots.py` | plots of losses, hand paths and single-trial signals |
+| `demo1_visualize.ipynb`, `visualize_modular.ipynb` | load a trained model and analyse its activity |
+| `motornet/` | the arm and muscle simulation library |
+
+To extend: a new task goes in `my_task.py`, a new loss in `my_loss.py`, a new
+architecture is a new `go_*.py` script.
+
 ## Parallel computing on Apple Silicon
 
 Doing `brew install libomp` will help make things stable when doing parallel training especially with compile directives.
