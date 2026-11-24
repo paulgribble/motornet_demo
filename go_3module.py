@@ -20,7 +20,7 @@ model = ReachingModel.create(
 
 # fast=True uses the equivalent but ~3x faster simulation in fast_rollout.py (it takes a minute or two to
 # compile the first time, so it is only worth it for long runs like this one)
-model.train(n_batches=10000, batch_size=32, fast=True)
+model.train(n_batches=10000, batch_size=32, fast=True, plot_interval=1000)
 model.train(n_batches=500, batch_size=8, task_mode='center_out')
 model.test(n_targets=8)
 model.save()
