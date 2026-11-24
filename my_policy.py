@@ -72,6 +72,7 @@ class ModularPolicyGRU(nn.Module):
         self.output_size = output_size
         self.connectivity_delay = connectivity_delay
         self.output_delay = output_delay
+        self.hidden_noise = 1e-3  # std of the noise added to each unit's input, independently per trial and timestep
         self.max_connectivity_delay = int(np.max(connectivity_delay))  # plain int keeps th.compile happy
         self.max_delay = int(np.max([self.max_connectivity_delay, self.output_delay]))
         self.h_buffer = []
@@ -182,7 +183,7 @@ class ModularPolicyGRU(nn.Module):
                 concat_hidden = th.cat((x, r * h_prev_delayed), dim=1)
                 h_tilda = self.activation(F.linear(concat_hidden, self.Wh[self.module_dims[i], :],
                                                    self.bh[self.module_dims[i]]) +
-                                          (th.randn(len(self.module_dims[i])) * 1e-3))
+                                          (th.randn(h_prev.shape[0], len(self.module_dims[i])) * self.hidden_noise))
                 h_new[:, self.module_dims[i]] = (1 - z) * h_prev_delayed[:, self.module_dims[i]] + z * h_tilda
 
         # If there are no delays between modules we can do a single pass
@@ -191,7 +192,7 @@ class ModularPolicyGRU(nn.Module):
             z = th.sigmoid(F.linear(concat, self.Wz, self.bz))                    # update gate
             r = th.sigmoid(F.linear(concat, self.Wr, self.br))                    # reset gate
             concat_hidden = th.cat((x, r * h_prev), dim=1)
-            h_tilda = self.activation(F.linear(concat_hidden, self.Wh, self.bh) + (th.randn(self.Wh.shape[0]) * 1e-3))
+            h_tilda = self.activation(F.linear(concat_hidden, self.Wh, self.bh) + (th.randn_like(h_prev) * self.hidden_noise))
             h_new = (1 - z) * h_prev + z * h_tilda
 
         # Output layer

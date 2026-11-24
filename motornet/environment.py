@@ -86,20 +86,22 @@ class Environment(gym.Env, th.nn.Module):
     self.action_frame_stacking = action_frame_stacking
 
     # default is no delay
-    proprioception_delay = self.dt if proprioception_delay is None else proprioception_delay
-    vision_delay = self.dt if vision_delay is None else vision_delay
+    proprioception_delay = 0. if proprioception_delay is None else proprioception_delay
+    vision_delay = 0. if vision_delay is None else vision_delay
 
     def floating_precision(x): return x < np.finfo(x).resolution
     assert floating_precision(np.mod(vision_delay / self.dt, 1.)), f"delay was {vision_delay} and dt was {self.dt}"
     assert floating_precision(np.mod(proprioception_delay / self.dt, 1.)), f"delay was {proprioception_delay} and " + \
       f"dt was {self.dt}"
 
-    self.proprioception_delay = int(proprioception_delay / self.dt)
-    self.vision_delay = int(vision_delay / self.dt)
+    # Delays in timesteps. The observation at step t holds the feedback sampled `delay` steps earlier
+    # (0 = the current state), so each buffer holds delay + 1 samples: [oldest, ..., newest].
+    self.proprioception_delay = int(round(proprioception_delay / self.dt))
+    self.vision_delay = int(round(vision_delay / self.dt))
     
     self.obs_buffer = {
-      "proprioception": [None] * self.proprioception_delay,
-      "vision":  [None] * self.vision_delay,
+      "proprioception": [None] * (self.proprioception_delay + 1),
+      "vision":  [None] * (self.vision_delay + 1),
       "action": [None] * self.action_frame_stacking
     }
 
@@ -116,7 +118,7 @@ class Environment(gym.Env, th.nn.Module):
     self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(obs.shape[-1],), dtype=np.float32)
 
     def handle_noise_arg(noise, space):
-      return [noise] * space.shape[0] if (type(noise) is float or int) else noise
+      return [noise] * space.shape[0] if np.isscalar(noise) else noise
 
     self.action_noise = handle_noise_arg(self._action_noise, self.action_space)
     self.obs_noise = handle_noise_arg(self._obs_noise, self.observation_space)
@@ -279,8 +281,9 @@ class Environment(gym.Env, th.nn.Module):
     
     # initialize buffer
     action = th.zeros((batch_size, self.action_space.shape[0])).to(self.device)
-    self.obs_buffer["proprioception"] = [self.get_proprioception()] * len(self.obs_buffer["proprioception"])
-    self.obs_buffer["vision"] = [self.get_vision()] * len(self.obs_buffer["vision"])
+    # (one independent noisy sample of the initial state per buffer slot)
+    self.obs_buffer["proprioception"] = [self.get_proprioception() for _ in self.obs_buffer["proprioception"]]
+    self.obs_buffer["vision"] = [self.get_vision() for _ in self.obs_buffer["vision"]]
     self.obs_buffer["action"] = [action] * self.action_frame_stacking
 
     action = action if self.differentiable else self.detach(action)
@@ -369,7 +372,11 @@ class Environment(gym.Env, th.nn.Module):
     Returns:
       A noisy version of `loc` as a `tensor`.
     """
-    white_noise = self.np_random.normal(size=(loc.shape[0], len(noise)), scale=noise)
+    # One independent sample per element of `loc`. A scalar or length-1 `noise` gives every column the same
+    # standard deviation; otherwise `noise` holds one standard deviation per column.
+    scale = np.atleast_1d(np.asarray(noise, dtype=np.float64))
+    assert scale.size in (1, loc.shape[1]), f"noise has {scale.size} elements but the input has {loc.shape[1]} columns"
+    white_noise = self.np_random.normal(size=tuple(loc.shape), scale=scale)
     return loc + th.tensor(white_noise, dtype=th.float32).to(self.device)
 
   def get_attributes(self):
@@ -480,8 +487,9 @@ class RandomTargetReach(Environment):
 
     action = th.zeros((batch_size, self.action_space.shape[0])).to(self.device)
 
-    self.obs_buffer["proprioception"] = [self.get_proprioception()] * len(self.obs_buffer["proprioception"])
-    self.obs_buffer["vision"] = [self.get_vision()] * len(self.obs_buffer["vision"])
+    # (one independent noisy sample of the initial state per buffer slot)
+    self.obs_buffer["proprioception"] = [self.get_proprioception() for _ in self.obs_buffer["proprioception"]]
+    self.obs_buffer["vision"] = [self.get_vision() for _ in self.obs_buffer["vision"]]
     self.obs_buffer["action"] = [action] * self.action_frame_stacking
 
     action = action if self.differentiable else self.detach(action)
