@@ -26,8 +26,7 @@ def run_episode(env, task, policy, batch_size, n_t, device, k=0, dmax=0.30):
     Args:
         env, task, policy: the environment, task and network
         batch_size: number of trials
-        n_t: number of timesteps of task input to generate (the episode itself ends
-             when env.max_ep_duration is reached)
+        n_t: number of timesteps to simulate
         k: force field strength (0 = no force field)
         dmax: maximum reach distance for random reaches (m)
 
@@ -42,7 +41,6 @@ def run_episode(env, task, policy, batch_size, n_t, device, k=0, dmax=0.30):
     init_states = th.tensor(init_states, device=device, dtype=th.float)
     h = policy.init_hidden(batch_size)
     obs, info = env.reset(options={'batch_size': batch_size, 'joint_state': init_states})
-    terminated = False
 
     # Force field is off during the hold period (go cue ~0) and on once the go cue is given (~1).
     # The go cue input is 0 or 1 plus a little noise, so threshold halfway.
@@ -50,22 +48,19 @@ def run_episode(env, task, policy, batch_size, n_t, device, k=0, dmax=0.30):
 
     # Per-timestep storage (stacked along the time axis at the end)
     log = {key: [] for key in ('xy', 'hidden', 'actions', 'muscle', 'force', 'joint')}
-    steps = []
 
-    while not terminated:
-        t_step = int(env.elapsed / env.dt)
+    for t_step in range(n_t):
 
         # the network sees the sensory feedback followed by the task inputs
         obs = th.concat((obs, inp[:, t_step, :]), dim=1)
         action, h = policy(obs, h)
 
         if k == 0:
-            obs, _, terminated, _, info = env.step(action=action)
+            obs, _, _, _, info = env.step(action=action)
         else:
             force_field = applied_load(endpoint_vel=info['states']['cartesian'][:, 2:], k=k, mode='CW')
-            obs, _, terminated, _, info = env.step(action=action, endpoint_load=force_field * force_mask[:, t_step])
+            obs, _, _, _, info = env.step(action=action, endpoint_load=force_field * force_mask[:, t_step])
 
-        steps.append(t_step)
         log['xy'].append(info['states']['cartesian'])
         log['hidden'].append(h)
         log['actions'].append(action)
@@ -84,8 +79,8 @@ def run_episode(env, task, policy, batch_size, n_t, device, k=0, dmax=0.30):
         'actions': th.stack(log['actions'], dim=1),
         'muscle': th.stack(log['muscle'], dim=1),
         'force': th.stack(log['force'], dim=1),
-        'targets': targets[:, steps, :],
-        'inp': inp[:, steps, :],
+        'targets': targets,
+        'inp': inp,
         'joint': th.stack(log['joint'], dim=1),
         'l1': env.skeleton.l1,
         'l2': env.skeleton.l2,

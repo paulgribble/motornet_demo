@@ -60,7 +60,7 @@ class Muscle(th.nn.Module):
     self.built = False
 
   def clip_activation(self, a):
-    return th.clamp(a, self.min_activation, 1.)
+    return th.clamp(a, min=self.min_activation, max=th.ones_like(self.min_activation))  # tensor bounds: no graph break
   
   @property
   def device(self):

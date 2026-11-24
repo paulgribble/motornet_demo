@@ -72,7 +72,7 @@ class ModularPolicyGRU(nn.Module):
         self.output_size = output_size
         self.connectivity_delay = connectivity_delay
         self.output_delay = output_delay
-        self.max_connectivity_delay = np.max(connectivity_delay)
+        self.max_connectivity_delay = int(np.max(connectivity_delay))  # plain int keeps th.compile happy
         self.max_delay = int(np.max([self.max_connectivity_delay, self.output_delay]))
         self.h_buffer = []
         rng = np.random.default_rng(seed=random_seed or None)
