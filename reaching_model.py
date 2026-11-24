@@ -43,6 +43,7 @@ from my_task import ExperimentTask
 from my_policy import ModularPolicyGRU
 from my_loss import michaels_modular_loss as calculate_loss
 from my_utils import run_episode, model_path
+from fast_rollout import run_episode_fast, FAST_PRESET
 from my_plots import plot_losses, plot_handpaths, plot_signals
 
 
@@ -52,6 +53,7 @@ class ModelConfig:
     name: str
     n_modules: int = 2            # always set from module_sizes (see __post_init__)
     episode_duration: float = 3.0 # seconds
+    # sensory delays (s): at each timestep the network receives the feedback sensed this long ago
     proprioception_delay: float = 0.01
     vision_delay: float = 0.11
     proprioception_noise: float = 1e-3
@@ -177,19 +179,27 @@ class ReachingModel:
             print(f"Saved model to '{self.name}/'")
 
     def train(self, n_batches=10000, batch_size=64, ff_strength=0.0, task_mode="random",
-              plot_interval=100, quiet=False):
+              plot_interval=100, quiet=False, fast=False):
         """Train the model, saving plots and the model every plot_interval batches (0 = never).
 
         task_mode: "random" for random reaches, "center_out" for center-out reaches
         ff_strength: force field strength (0 = no force field)
+        fast: False = the standard simulation (my_utils.run_episode); True = the equivalent but faster
+              implementation in fast_rollout.py (compiles on first use, ~1 min, and again whenever
+              batch_size changes); or a dict of options for fast_rollout.run_episode_fast.
         Calling train() again continues training. Returns the loss history.
         """
+        fast_options = FAST_PRESET if fast is True else fast
         self.task.run_mode = 'train' if task_mode == "random" else 'train_center_out'
         n_t = int(self.config.episode_duration / self.env.dt)
         loss_history = self.training_state.loss_history
 
         for i in tqdm(range(n_batches), desc=f"Training '{self.name}'", unit="batch", disable=quiet):
-            episode_data = run_episode(self.env, self.task, self.policy, batch_size, n_t, self.device, k=ff_strength)
+            if fast:
+                episode_data = run_episode_fast(self.env, self.task, self.policy, batch_size, n_t, self.device,
+                                                k=ff_strength, **fast_options)
+            else:
+                episode_data = run_episode(self.env, self.task, self.policy, batch_size, n_t, self.device, k=ff_strength)
             loss = calculate_loss(episode_data)
             loss['total'].backward()
             th.nn.utils.clip_grad_norm_(self.policy.parameters(), max_norm=1)

@@ -46,6 +46,8 @@ uv run python demo1.py
 | `my_policy.py` | the networks: `PolicyGRU` and `ModularPolicyGRU` |
 | `my_loss.py` | the loss functions |
 | `my_utils.py` | `run_episode` (simulate a batch of trials), saving and loading |
+| `fast_rollout.py` | a faster, equivalent `run_episode` for long training runs: `model.train(..., fast=True)` |
+| `check_fast_rollout.py` | checks that `fast_rollout.py` and `run_episode` still agree |
 | `my_plots.py` | plots of losses, hand paths and single-trial signals |
 | `demo1_visualize.ipynb`, `visualize_modular.ipynb` | load a trained model and analyse its activity |
 | `motornet/` | the arm and muscle simulation library |
