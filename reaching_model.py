@@ -41,7 +41,7 @@ import motornet as mn
 from my_env import ExperimentEnv
 from my_task import ExperimentTask
 from my_policy import ModularPolicyGRU
-from my_loss import michaels_modular_loss as calculate_loss
+from my_loss import plg_modular_loss as calculate_loss # define the loss function
 from my_utils import run_episode, model_path
 from fast_rollout import run_episode_fast, FAST_PRESET
 from my_plots import plot_losses, plot_handpaths, plot_signals
