@@ -46,6 +46,7 @@ class ModularPolicyGRU(nn.Module):
         connectivity_mask[i, j]: the proportion of units in module j that project to module i
         output_mask: from the module to the outputs (muscles)
     Connections that are absent at initialization stay absent during training.
+    freeze() stops chosen groups of weights from changing during any further training.
 
     Other arguments:
         module_size: number of units in each module
@@ -142,12 +143,18 @@ class ModularPolicyGRU(nn.Module):
         self.mask_bh = frozen(np.ones(hidden_size))
         self.mask_bY = frozen(np.ones(output_size))
 
-        # Remove the masked-out weights, and keep them at zero by masking their gradients
+        # Which weights can still learn (1 = trainable, 0 = fixed): everything, until freeze() is called.
+        # (Plain tensors rather than parameters, so they are not part of the saved weights.)
+        self.trainable = {name: th.ones_like(getattr(self, name))
+                          for name in ('Wz', 'Wr', 'Wh', 'Y', 'bz', 'br', 'bh', 'bY')}
+
+        # Remove the masked-out weights, and keep them at zero by masking their gradients.
+        # The gradients of fixed weights are zeroed in the same way.
         for name in ('Wz', 'Wr', 'Wh', 'Y', 'bz', 'br', 'bh', 'bY'):
             param, mask = getattr(self, name), getattr(self, 'mask_' + name)
             with th.no_grad():
                 param.mul_(mask)
-            param.register_hook(lambda grad, mask=mask: grad * mask.data)
+            param.register_hook(lambda grad, mask=mask, name=name: grad * mask.data * self.trainable[name])
 
         # Optionally rescale the recurrent weights of Wh to a given spectral radius
         if spectral_scaling:
@@ -158,6 +165,33 @@ class ModularPolicyGRU(nn.Module):
                     self.Wh.data = th.cat((Wh_input, spectral_scaling * (Wh_hidden / eig_norm)), dim=1)
 
         self.to(device)
+
+    def freeze(self, connections=(), inputs=False, outputs=False, hidden_biases=False):
+        """Fix groups of weights at their current values for all further training.
+
+        connections: (sending module, receiving module) pairs of module indices, e.g. [(2, 1)]
+                     fixes the weights from module 2 onto module 1
+        inputs: fix the weights from the inputs (vision, proprioception, task) onto all hidden units
+        outputs: fix the weights from the hidden units to the outputs, and the output biases
+        hidden_biases: fix the biases of all hidden units (a unit has one bias per gate, shared by
+                       its input and recurrent connections)
+        Weights "onto" a unit are fixed in all three GRU gates (Wz, Wr, Wh). Freezing accumulates
+        over calls, and only stops the gradients: the optimizer must not move the weights either
+        (see ReachingModel.freeze, which also clears the optimizer's momentum).
+        """
+        for name in ('Wz', 'Wr', 'Wh'):
+            if inputs:
+                self.trainable[name][:, :self.input_size] = 0
+            for sender, receiver in connections:
+                rows = th.as_tensor(self.module_dims[receiver])
+                cols = th.as_tensor(self.module_dims[sender]) + self.input_size
+                self.trainable[name][rows[:, None], cols[None, :]] = 0
+        if outputs:
+            self.trainable['Y'].zero_()
+            self.trainable['bY'].zero_()
+        if hidden_biases:
+            for name in ('bz', 'br', 'bh'):
+                self.trainable[name].zero_()
 
     @th.compile(mode='max-autotune')
     def update_buffer(self, h_buffer, h_prev):

@@ -88,6 +88,7 @@ class TrainingState:
     """Training progress (saved as <name>_training_state.json)."""
     batches_completed: int = 0
     loss_history: dict = field(default_factory=dict)
+    frozen: list = field(default_factory=list)   # the arguments of each call to ReachingModel.freeze()
 
 
 class ReachingModel:
@@ -156,15 +157,20 @@ class ReachingModel:
         return model
 
     @classmethod
-    def load(cls, name):
-        """Load a previously saved model from its directory."""
+    def load(cls, name, checkpoint=None):
+        """Load a previously saved model from its directory. checkpoint: load the weights saved by
+        save_checkpoint(checkpoint) instead of the latest weights."""
         with open(model_path(name, "config.json")) as f:
             config = ModelConfig(**json.load(f))
         with open(model_path(name, "training_state.json")) as f:
             training_state = TrainingState(**json.load(f))
         model = cls(config, training_state)
-        model.policy.load_state_dict(th.load(model_path(name, "weights.pkl"), weights_only=True))
-        print(f"Loaded model '{name}' (batches trained: {training_state.batches_completed})")
+        weights_file = model_path(name, f"weights_{checkpoint}.pkl" if checkpoint else "weights.pkl")
+        model.policy.load_state_dict(th.load(weights_file, weights_only=True))
+        for spec in training_state.frozen:   # weights that were fixed stay fixed if training continues
+            model._apply_freeze(**spec)
+        print(f"Loaded model '{name}' (batches trained: {training_state.batches_completed})"
+              + (f", with the weights of checkpoint '{checkpoint}'" if checkpoint else ""))
         return model
 
     def save(self, quiet=False):
@@ -177,6 +183,43 @@ class ReachingModel:
             json.dump(asdict(self.training_state), f, indent=2)
         if not quiet:
             print(f"Saved model to '{self.name}/'")
+
+    def save_checkpoint(self, checkpoint):
+        """Keep a copy of the current weights, e.g. to compare the network before and after more
+        training. Load it with ReachingModel.load(name, checkpoint=...)."""
+        th.save(self.policy.state_dict(), model_path(self.name, f"weights_{checkpoint}.pkl"))
+
+    def freeze(self, connections=(), inputs=False, outputs=False, hidden_biases=False):
+        """Fix groups of weights at their current values for all further training (also after
+        saving and loading the model).
+
+        connections: (sending module, receiving module) pairs of module names, e.g.
+                     [("spinal", "motor")] fixes the weights from spinal onto motor
+        inputs: fix the weights from the inputs (vision, proprioception, task) onto all hidden units
+        outputs: fix the weights from the hidden units to the muscles, and the output biases
+        hidden_biases: fix the biases of all hidden units (a unit has one bias per gate, shared by
+                       its input and recurrent connections)
+        """
+        spec = dict(connections=[list(c) for c in connections], inputs=inputs, outputs=outputs,
+                    hidden_biases=hidden_biases)
+        self._apply_freeze(**spec)
+        self.training_state.frozen.append(spec)
+
+        trainable = self.policy.trainable
+        n_fixed = sum(int((getattr(self.policy, 'mask_' + n) * (1 - t)).sum()) for n, t in trainable.items())
+        n_total = sum(int(getattr(self.policy, 'mask_' + n).sum()) for n in trainable)
+        print(f"Froze weights of '{self.name}': {n_fixed} of {n_total} weights and biases are now fixed")
+
+    def _apply_freeze(self, connections, inputs, outputs, hidden_biases):
+        names = self.config.module_names
+        self.policy.freeze([(names.index(s), names.index(r)) for s, r in connections],
+                           inputs=inputs, outputs=outputs, hidden_biases=hidden_biases)
+        # Zero gradients are not enough: Adam would keep moving the fixed weights for a while, using
+        # the momentum it built up before they were fixed. Without momentum their update is exactly 0.
+        for name, trainable in self.policy.trainable.items():
+            state = self.optimizer.state.get(getattr(self.policy, name))
+            if state:
+                state['exp_avg'].mul_(trainable)
 
     def train(self, n_batches=10000, batch_size=64, ff_strength=0.0, task_mode="random",
               plot_interval=100, quiet=False, fast=False):
@@ -262,5 +305,6 @@ class ReachingModel:
             f"  Architecture: [{modules}]\n"
             f"  Episode duration: {self.config.episode_duration}s\n"
             f"  Batches trained: {self.training_state.batches_completed}\n"
+            f"  Frozen weights: {self.training_state.frozen or 'none'}\n"
             f"  Directory: {self.name}/"
         )

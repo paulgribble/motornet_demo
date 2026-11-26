@@ -40,6 +40,7 @@ uv run python demo1.py
 |---|---|
 | `demo1.py` | start here: trains a plain GRU step by step, then tests it |
 | `go_1module.py` ... `go_4module.py` | train modular networks (1 to 4 "brain areas") |
+| `go_3module_FF.py`, `go_4module_FF.py` | train in the null field, fix some of the weights (`model.freeze`), then learn a curl force field |
 | `reaching_model.py` | `ReachingModel`: create / train / test / save / load a modular network |
 | `my_env.py` | the environment: what the network senses |
 | `my_task.py` | the task: what trials look like (targets, go cue, catch trials) |
@@ -50,6 +51,7 @@ uv run python demo1.py
 | `check_fast_rollout.py` | checks that `fast_rollout.py` and `run_episode` still agree |
 | `my_plots.py` | plots of losses, hand paths and single-trial signals |
 | `demo1_visualize.ipynb`, `visualize_modular.ipynb` | load a trained model and analyse its activity |
+| `visualize_modular_FF.ipynb` | what changes from the end of null field training to the end of force field learning: weights, and activity during preparation and movement |
 | `motornet/` | the arm and muscle simulation library |
 
 To extend: a new task goes in `my_task.py`, a new loss in `my_loss.py`, a new
